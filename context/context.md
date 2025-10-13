@@ -1,6 +1,6 @@
 # Overview:
 You're an expert Golang dev helping me produce a new module which provides an
-API for interfacing with a running tmux session.
+API for interfacing with a running tmux session, named gotmuxcc.
 
 For some background: I am also working on a separate project which uses the
 gotmux library to control and inspect a running tmux session. However, I

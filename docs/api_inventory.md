@@ -3,7 +3,8 @@
 Source reference: `/tmp/gotmux/gotmux` (commit unspecified).
 
 This document captures the exported surface of the original `gotmux` package.
-`gotmuxcc` should mirror these definitions (names, signatures, and field sets)
+The new `gotmuxcc` package should mirror these definitions (names, signatures,
+and field sets)
 so existing consumers can migrate with minimal disruption.
 
 ## Packages

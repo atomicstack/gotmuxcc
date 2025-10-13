@@ -1,0 +1,23 @@
+# Go build artifacts
+bin/
+dist/
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+
+# Go workspace files
+*.log
+.gocache/
+cover.out
+
+# Editor / IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Temporary files
+*~
