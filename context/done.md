@@ -82,5 +82,7 @@ Here’s what’s happened so far:
 - Patched query result parsing to tolerate separator characters inside fields
   and enriched window records with owning session metadata so downstream
   consumers see complete session/window snapshots.
+- Added a default 3Hz command rate limiter in the router with tests to cap tmux
+  polling frequency and avoid flooding the backend with repeated queries.
 - Added an end-to-end tmux integration scenario that renames windows, splits
   panes, sends commands, and asserts session/window/pane state through the API.
