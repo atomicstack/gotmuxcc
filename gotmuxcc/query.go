@@ -118,8 +118,10 @@ func (o *queryOutput) collect() []queryResult {
 		}
 
 		values := strings.SplitN(stripped, querySeparator, len(o.variables))
-		if len(values) != len(o.variables) {
-			continue
+		if len(values) < len(o.variables) {
+			missing := len(o.variables) - len(values)
+			extra := make([]string, missing)
+			values = append(values, extra...)
 		}
 
 		entry := make(queryResult)

@@ -1,7 +1,9 @@
 package gotmuxcc
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 )
 
 func (q *query) windowVars() *query {
@@ -225,7 +227,7 @@ func (t *Tmux) ListAllWindows() ([]*Window, error) {
 	for _, session := range sessions {
 		ws, err := session.ListWindows()
 		if err != nil {
-			return nil, fmt.Errorf("failed to list windows for session %q: %w", session.Name, err)
+			continue
 		}
 		combined = append(combined, ws...)
 	}
@@ -269,7 +271,7 @@ func (t *Tmux) ListAllPanes() ([]*Pane, error) {
 	for _, window := range windows {
 		ps, err := window.ListPanes()
 		if err != nil {
-			return nil, fmt.Errorf("failed to list panes for window %q: %w", window.Id, err)
+			continue
 		}
 		combined = append(combined, ps...)
 	}
@@ -341,9 +343,42 @@ func (t *Tmux) GetClient() (*Client, error) {
 
 // ListWindows returns the windows belonging to a session.
 func (s *Session) ListWindows() ([]*Window, error) {
+	targets := []string{}
+	if id := strings.TrimSpace(s.Id); id != "" {
+		targets = append(targets, id)
+	}
+	if name := strings.TrimSpace(s.Name); name != "" && name != strings.TrimSpace(s.Id) {
+		targets = append(targets, name)
+	}
+
+	var lastErr error
+	for _, target := range targets {
+		windows, err := s.listWindowsWithTarget(target)
+		if err == nil {
+			return windows, nil
+		}
+		lastErr = err
+		var cmdErr *commandError
+		if errors.As(err, &cmdErr) {
+			continue
+		}
+		return nil, err
+	}
+
+	if lastErr != nil {
+		var cmdErr *commandError
+		if errors.As(lastErr, &cmdErr) {
+			return []*Window{}, nil
+		}
+		return nil, lastErr
+	}
+	return []*Window{}, nil
+}
+
+func (s *Session) listWindowsWithTarget(target string) ([]*Window, error) {
 	output, err := s.tmux.query().
 		cmd("list-windows").
-		fargs("-t", s.Name).
+		fargs("-t", target).
 		windowVars().
 		run()
 	if err != nil {

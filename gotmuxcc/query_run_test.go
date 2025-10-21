@@ -50,3 +50,20 @@ func TestQueryRunError(t *testing.T) {
 		t.Fatalf("expected run to fail")
 	}
 }
+
+func TestQueryCollectHandlesSentinelInField(t *testing.T) {
+	qo := &queryOutput{
+		result: commandResult{
+			Lines: []string{"'sess-1-:-/tmp/foo-:-stack-:-3'"},
+		},
+		variables: []string{"name", "path", "stack", "windows"},
+	}
+
+	res := qo.collect()
+	if len(res) != 1 {
+		t.Fatalf("expected single result, got %d", len(res))
+	}
+	if res[0].get("path") != "/tmp/foo" || res[0].get("stack") != "stack" {
+		t.Fatalf("unexpected collected data: %#v", res[0])
+	}
+}
