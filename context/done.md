@@ -79,5 +79,8 @@ Here’s what’s happened so far:
 - Fixed ListAllWindows/ListAllPanes to fall back to per-session queries when
   control-mode "%all" queries return empty, matching gotmux behavior and added
   unit coverage for the regression scenario.
+- Patched query result parsing to tolerate separator characters inside fields
+  and enriched window records with owning session metadata so downstream
+  consumers see complete session/window snapshots.
 - Added an end-to-end tmux integration scenario that renames windows, splits
   panes, sends commands, and asserts session/window/pane state through the API.
