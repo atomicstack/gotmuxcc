@@ -207,6 +207,7 @@ func TestListAllWindowsFallback(t *testing.T) {
 			formatRecord(windowVars, map[string]string{
 				varWindowId:     "@1",
 				varWindowName:   "popup",
+				varSessionName:  "popup",
 				varWindowIndex:  "0",
 				varWindowPanes:  "1",
 				varWindowActive: "1",
@@ -273,6 +274,7 @@ func TestListAllPanesFallback(t *testing.T) {
 			formatRecord(windowVars, map[string]string{
 				varWindowId:    "@1",
 				varWindowName:  "popup",
+				varSessionName: "popup",
 				varWindowIndex: "0",
 				varWindowPanes: "1",
 			}),

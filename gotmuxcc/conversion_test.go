@@ -85,9 +85,10 @@ func TestWindowConversion(t *testing.T) {
 		varWindowLinked:             "1",
 		varWindowLinkedSessions:     "1",
 		varWindowLinkedSessionsList: "s0",
-		varWindowMarkedFlag:         "0",
-		varWindowName:               "main",
-		varWindowOffsetX:            "0",
+	varWindowMarkedFlag:         "0",
+	varWindowName:               "main",
+	varSessionName:              "sess",
+	varWindowOffsetX:            "0",
 		varWindowOffsetY:            "0",
 		varWindowPanes:              "2",
 		varWindowRawFlags:           "-",
@@ -100,7 +101,7 @@ func TestWindowConversion(t *testing.T) {
 	}
 
 	w := qr.toWindow(&Tmux{})
-	if w.Name != "main" || !w.Active || w.Panes != 2 || len(w.ActiveClientsList) != 2 {
+	if w.Name != "main" || w.Session != "sess" || !w.Active || w.Panes != 2 || len(w.ActiveClientsList) != 2 {
 		t.Fatalf("unexpected window conversion: %#v", w)
 	}
 }

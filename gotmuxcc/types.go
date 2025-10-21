@@ -104,6 +104,7 @@ type Window struct {
 	LinkedSessionsList []string
 	MarkedFlag         bool
 	Name               string
+	Session            string
 	OffsetX            int
 	OffsetY            int
 	Panes              int

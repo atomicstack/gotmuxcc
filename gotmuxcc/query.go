@@ -109,8 +109,15 @@ func (o *queryOutput) collect() []queryResult {
 			continue
 		}
 
-		stripped := strings.Trim(line, "'")
-		values := strings.Split(stripped, querySeparator)
+		stripped := line
+		if strings.HasPrefix(stripped, "'") {
+			stripped = strings.TrimPrefix(stripped, "'")
+			if strings.HasSuffix(stripped, "'") {
+				stripped = strings.TrimSuffix(stripped, "'")
+			}
+		}
+
+		values := strings.SplitN(stripped, querySeparator, len(o.variables))
 		if len(values) != len(o.variables) {
 			continue
 		}

@@ -40,6 +40,7 @@ func (q *query) windowVars() *query {
 		varWindowVisibleLayout,
 		varWindowWidth,
 		varWindowZoomedFlag,
+		varSessionName,
 	)
 }
 
@@ -69,6 +70,7 @@ func (r queryResult) toWindow(t *Tmux) *Window {
 		LinkedSessionsList: parseList(r.get(varWindowLinkedSessionsList)),
 		MarkedFlag:         isOne(r.get(varWindowMarkedFlag)),
 		Name:               r.get(varWindowName),
+		Session:            r.get(varSessionName),
 		OffsetX:            atoi(r.get(varWindowOffsetX)),
 		OffsetY:            atoi(r.get(varWindowOffsetY)),
 		Panes:              atoi(r.get(varWindowPanes)),
