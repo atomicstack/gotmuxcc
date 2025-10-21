@@ -76,5 +76,8 @@ Here’s what’s happened so far:
   when tests run from package subdirectories.
 - Added control transport unit tests using scripted fake tmux binaries to cover
   successful command flow and stderr-driven failure propagation.
+- Fixed ListAllWindows/ListAllPanes to fall back to per-session queries when
+  control-mode "%all" queries return empty, matching gotmux behavior and added
+  unit coverage for the regression scenario.
 - Added an end-to-end tmux integration scenario that renames windows, splits
   panes, sends commands, and asserts session/window/pane state through the API.
