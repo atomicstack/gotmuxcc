@@ -206,6 +206,31 @@ func (w *Window) ListActiveClients() ([]*Client, error) {
 
 // ListAllWindows lists all tmux windows across sessions.
 func (t *Tmux) ListAllWindows() ([]*Window, error) {
+	windows, err := t.listAllWindowsDirect()
+	if err != nil {
+		return nil, err
+	}
+	if len(windows) > 0 {
+		return windows, nil
+	}
+
+	sessions, err := t.ListSessions()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list all windows via sessions: %w", err)
+	}
+
+	var combined []*Window
+	for _, session := range sessions {
+		ws, err := session.ListWindows()
+		if err != nil {
+			return nil, fmt.Errorf("failed to list windows for session %q: %w", session.Name, err)
+		}
+		combined = append(combined, ws...)
+	}
+	return combined, nil
+}
+
+func (t *Tmux) listAllWindowsDirect() ([]*Window, error) {
 	output, err := t.query().
 		cmd("list-windows").
 		fargs("-a").
@@ -225,6 +250,31 @@ func (t *Tmux) ListAllWindows() ([]*Window, error) {
 
 // ListAllPanes lists all panes across sessions.
 func (t *Tmux) ListAllPanes() ([]*Pane, error) {
+	panes, err := t.listAllPanesDirect()
+	if err != nil {
+		return nil, err
+	}
+	if len(panes) > 0 {
+		return panes, nil
+	}
+
+	windows, err := t.ListAllWindows()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list all panes via windows: %w", err)
+	}
+
+	var combined []*Pane
+	for _, window := range windows {
+		ps, err := window.ListPanes()
+		if err != nil {
+			return nil, fmt.Errorf("failed to list panes for window %q: %w", window.Id, err)
+		}
+		combined = append(combined, ps...)
+	}
+	return combined, nil
+}
+
+func (t *Tmux) listAllPanesDirect() ([]*Pane, error) {
 	output, err := t.query().
 		cmd("list-panes").
 		fargs("-a").
