@@ -210,28 +210,38 @@ func (w *Window) ListActiveClients() ([]*Client, error) {
 
 // ListAllWindows lists all tmux windows across sessions.
 func (t *Tmux) ListAllWindows() ([]*Window, error) {
-	windows, err := t.listAllWindowsDirect()
-	if err != nil {
-		return nil, err
-	}
-	if len(windows) > 0 {
-		return windows, nil
+	windows, directErr := t.listAllWindowsDirect()
+	windowMap := make(map[string]*Window, len(windows))
+	for _, w := range windows {
+		windowMap[w.Id] = w
 	}
 
 	sessions, err := t.ListSessions()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list all windows via sessions: %w", err)
+	if err == nil {
+		for _, session := range sessions {
+			ws, serr := session.ListWindows()
+			if serr != nil {
+				continue
+			}
+			for _, w := range ws {
+				if strings.TrimSpace(w.Session) == "" {
+					w.Session = session.Name
+				}
+				if _, ok := windowMap[w.Id]; ok {
+					continue
+				}
+				windowMap[w.Id] = w
+				windows = append(windows, w)
+			}
+		}
 	}
 
-	var combined []*Window
-	for _, session := range sessions {
-		ws, err := session.ListWindows()
-		if err != nil {
-			continue
+	if len(windows) == 0 {
+		if directErr != nil {
+			return nil, directErr
 		}
-		combined = append(combined, ws...)
 	}
-	return combined, nil
+	return windows, nil
 }
 
 func (t *Tmux) listAllWindowsDirect() ([]*Window, error) {
@@ -254,28 +264,35 @@ func (t *Tmux) listAllWindowsDirect() ([]*Window, error) {
 
 // ListAllPanes lists all panes across sessions.
 func (t *Tmux) ListAllPanes() ([]*Pane, error) {
-	panes, err := t.listAllPanesDirect()
-	if err != nil {
-		return nil, err
-	}
-	if len(panes) > 0 {
-		return panes, nil
+	panes, directErr := t.listAllPanesDirect()
+	paneMap := make(map[string]*Pane, len(panes))
+	for _, p := range panes {
+		paneMap[p.Id] = p
 	}
 
 	windows, err := t.ListAllWindows()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list all panes via windows: %w", err)
+	if err == nil {
+		for _, window := range windows {
+			ps, serr := window.ListPanes()
+			if serr != nil {
+				continue
+			}
+			for _, p := range ps {
+				if _, ok := paneMap[p.Id]; ok {
+					continue
+				}
+				paneMap[p.Id] = p
+				panes = append(panes, p)
+			}
+		}
 	}
 
-	var combined []*Pane
-	for _, window := range windows {
-		ps, err := window.ListPanes()
-		if err != nil {
-			continue
+	if len(panes) == 0 {
+		if directErr != nil {
+			return nil, directErr
 		}
-		combined = append(combined, ps...)
 	}
-	return combined, nil
+	return panes, nil
 }
 
 func (t *Tmux) listAllPanesDirect() ([]*Pane, error) {
