@@ -183,39 +183,30 @@ func (r *router) handleBegin(line string) {
 		return
 	}
 
-	var emit bool
-	var evt Event
-
 	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	if r.err != nil {
-		r.mu.Unlock()
 		return
 	}
 
 	if len(r.pending) == 0 {
-		emit = true
-		evt = eventForError("unexpected-begin", line, errUnexpectedBegin)
-		r.mu.Unlock()
-	} else {
-		req := r.pending[0]
-		r.pending = r.pending[1:]
-
-		state := &commandState{
-			request: req,
-			time:    timeStr,
-			number:  number,
-			flags:   flags,
-		}
-		r.inflight[number] = state
-		r.stack = append(r.stack, number)
-		trace.Printf("router", "begin <- #%s time=%s flags=%s command=%s", number, timeStr, flags, trace.FormatControlCommand(req.command))
-		r.mu.Unlock()
+		r.emitEventLocked(eventForError("unexpected-begin", line, errUnexpectedBegin))
+		return
 	}
 
-	if emit {
-		r.emitEvent(evt)
+	req := r.pending[0]
+	r.pending = r.pending[1:]
+
+	state := &commandState{
+		request: req,
+		time:    timeStr,
+		number:  number,
+		flags:   flags,
 	}
+	r.inflight[number] = state
+	r.stack = append(r.stack, number)
+	trace.Printf("router", "begin <- #%s time=%s flags=%s command=%s", number, timeStr, flags, trace.FormatControlCommand(req.command))
 }
 
 func (r *router) handleEnd(line string) {
@@ -240,55 +231,38 @@ func (r *router) handleError(line string) {
 }
 
 func (r *router) appendOutput(line string) {
-	var emit bool
-	var evt Event
-	var traceFn func()
-
 	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	if r.err != nil {
-		r.mu.Unlock()
 		return
 	}
 
 	if len(r.stack) == 0 {
-		emit = true
-		evt = Event{
+		r.emitEventLocked(Event{
 			Name:   "orphan-output",
 			Fields: []string{line},
 			Data:   line,
 			Raw:    line,
-		}
-		traceFn = func() {
-			trace.Printf("router", "orphan output <- %s", trace.FormatControlLine(line))
-		}
-	} else {
-		current := r.stack[len(r.stack)-1]
-		state := r.inflight[current]
-		if state == nil {
-			emit = true
-			evt = Event{
-				Name:   "unknown-command-output",
-				Fields: []string{line},
-				Data:   line,
-				Raw:    line,
-			}
-			traceFn = func() {
-				trace.Printf("router", "unknown output <- #%s %s", current, trace.FormatControlLine(line))
-			}
-		} else {
-			state.output = append(state.output, line)
-		}
+		})
+		trace.Printf("router", "orphan output <- %s", trace.FormatControlLine(line))
+		return
 	}
 
-	r.mu.Unlock()
+	current := r.stack[len(r.stack)-1]
+	state := r.inflight[current]
+	if state == nil {
+		r.emitEventLocked(Event{
+			Name:   "unknown-command-output",
+			Fields: []string{line},
+			Data:   line,
+			Raw:    line,
+		})
+		trace.Printf("router", "unknown output <- #%s %s", current, trace.FormatControlLine(line))
+		return
+	}
 
-	if emit {
-		r.emitEvent(evt)
-	}
-	if traceFn != nil {
-		traceFn()
-	}
+	state.output = append(state.output, line)
 }
 
 func (r *router) finishCommand(number, timeStr, flags string, cmdErr error, detail string) {
@@ -369,25 +343,42 @@ func (r *router) removeFromStack(number string) {
 
 func (r *router) emitEvent(evt Event) {
 	r.mu.Lock()
-	if r.err != nil || r.eventsClosed {
-		r.mu.Unlock()
+	sent, ok := r.enqueueEvent(evt)
+	r.mu.Unlock()
+	if !ok {
 		return
 	}
+	r.logEvent(evt, sent)
+}
 
-	var sent bool
+func (r *router) emitEventLocked(evt Event) {
+	sent, ok := r.enqueueEvent(evt)
+	if !ok {
+		return
+	}
+	r.logEvent(evt, sent)
+}
+
+func (r *router) enqueueEvent(evt Event) (sent bool, ok bool) {
+	if r.err != nil || r.eventsClosed {
+		return false, false
+	}
+
 	select {
 	case r.events <- evt:
-		sent = true
+		return true, true
 	default:
+		return false, true
 	}
-	r.mu.Unlock()
+}
 
+func (r *router) logEvent(evt Event, sent bool) {
 	if sent {
 		trace.Printf("router", "event <- %s data=%s", evt.Name, trace.FormatControlLine(evt.Data))
-	} else {
-		trace.Printf("router", "emitEvent dropped name=%s", evt.Name)
-		// Drop event to avoid blocking; router consumers should drain events when needed.
+		return
 	}
+	trace.Printf("router", "emitEvent dropped name=%s", evt.Name)
+	// Drop event to avoid blocking; router consumers should drain events when needed.
 }
 
 func (r *router) failAll(err error) {
