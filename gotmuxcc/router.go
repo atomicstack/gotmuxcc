@@ -93,9 +93,10 @@ type router struct {
 	stack    []string
 	err      error
 
-	events     chan Event
-	eventsOnce sync.Once
-	closed     chan struct{}
+	events       chan Event
+	eventsOnce   sync.Once
+	closed       chan struct{}
+	eventsClosed bool
 }
 
 func newRouter(t controlTransport) *router {
@@ -341,10 +342,23 @@ func (r *router) removeFromStack(number string) {
 }
 
 func (r *router) emitEvent(evt Event) {
+	r.mu.Lock()
+	if r.err != nil || r.eventsClosed {
+		r.mu.Unlock()
+		return
+	}
+
+	var sent bool
 	select {
 	case r.events <- evt:
-		trace.Printf("router", "event <- %s data=%s", evt.Name, trace.FormatControlLine(evt.Data))
+		sent = true
 	default:
+	}
+	r.mu.Unlock()
+
+	if sent {
+		trace.Printf("router", "event <- %s data=%s", evt.Name, trace.FormatControlLine(evt.Data))
+	} else {
 		trace.Printf("router", "emitEvent dropped name=%s", evt.Name)
 		// Drop event to avoid blocking; router consumers should drain events when needed.
 	}
@@ -361,6 +375,7 @@ func (r *router) failAll(err error) {
 		err = ErrTransportClosed
 	}
 	r.err = err
+	r.eventsClosed = true
 
 	pending := r.pending
 	r.pending = nil
