@@ -183,30 +183,39 @@ func (r *router) handleBegin(line string) {
 		return
 	}
 
+	var emit bool
+	var evt Event
+
 	r.mu.Lock()
-	defer r.mu.Unlock()
 
 	if r.err != nil {
+		r.mu.Unlock()
 		return
 	}
 
 	if len(r.pending) == 0 {
-		r.emitEvent(eventForError("unexpected-begin", line, errUnexpectedBegin))
-		return
+		emit = true
+		evt = eventForError("unexpected-begin", line, errUnexpectedBegin)
+		r.mu.Unlock()
+	} else {
+		req := r.pending[0]
+		r.pending = r.pending[1:]
+
+		state := &commandState{
+			request: req,
+			time:    timeStr,
+			number:  number,
+			flags:   flags,
+		}
+		r.inflight[number] = state
+		r.stack = append(r.stack, number)
+		trace.Printf("router", "begin <- #%s time=%s flags=%s command=%s", number, timeStr, flags, trace.FormatControlCommand(req.command))
+		r.mu.Unlock()
 	}
 
-	req := r.pending[0]
-	r.pending = r.pending[1:]
-
-	state := &commandState{
-		request: req,
-		time:    timeStr,
-		number:  number,
-		flags:   flags,
+	if emit {
+		r.emitEvent(evt)
 	}
-	r.inflight[number] = state
-	r.stack = append(r.stack, number)
-	trace.Printf("router", "begin <- #%s time=%s flags=%s command=%s", number, timeStr, flags, trace.FormatControlCommand(req.command))
 }
 
 func (r *router) handleEnd(line string) {
@@ -231,38 +240,55 @@ func (r *router) handleError(line string) {
 }
 
 func (r *router) appendOutput(line string) {
+	var emit bool
+	var evt Event
+	var traceFn func()
+
 	r.mu.Lock()
-	defer r.mu.Unlock()
 
 	if r.err != nil {
+		r.mu.Unlock()
 		return
 	}
 
 	if len(r.stack) == 0 {
-		r.emitEvent(Event{
+		emit = true
+		evt = Event{
 			Name:   "orphan-output",
 			Fields: []string{line},
 			Data:   line,
 			Raw:    line,
-		})
-		trace.Printf("router", "orphan output <- %s", trace.FormatControlLine(line))
-		return
+		}
+		traceFn = func() {
+			trace.Printf("router", "orphan output <- %s", trace.FormatControlLine(line))
+		}
+	} else {
+		current := r.stack[len(r.stack)-1]
+		state := r.inflight[current]
+		if state == nil {
+			emit = true
+			evt = Event{
+				Name:   "unknown-command-output",
+				Fields: []string{line},
+				Data:   line,
+				Raw:    line,
+			}
+			traceFn = func() {
+				trace.Printf("router", "unknown output <- #%s %s", current, trace.FormatControlLine(line))
+			}
+		} else {
+			state.output = append(state.output, line)
+		}
 	}
 
-	current := r.stack[len(r.stack)-1]
-	state := r.inflight[current]
-	if state == nil {
-		r.emitEvent(Event{
-			Name:   "unknown-command-output",
-			Fields: []string{line},
-			Data:   line,
-			Raw:    line,
-		})
-		trace.Printf("router", "unknown output <- #%s %s", current, trace.FormatControlLine(line))
-		return
-	}
+	r.mu.Unlock()
 
-	state.output = append(state.output, line)
+	if emit {
+		r.emitEvent(evt)
+	}
+	if traceFn != nil {
+		traceFn()
+	}
 }
 
 func (r *router) finishCommand(number, timeStr, flags string, cmdErr error, detail string) {
