@@ -53,9 +53,16 @@ func waitDone(t testing.TB, done <-chan error) error {
 
 func TestTransportSendAndReceive(t *testing.T) {
 	script := `
+last=""
 while [ $# -gt 0 ]; do
+	last="$1"
 	shift
 done
+
+if [ "$last" != "start-server" ]; then
+	echo "expected start-server command, got: $last" >&2
+	exit 3
+fi
 
 while IFS= read -r line; do
 	case "$line" in

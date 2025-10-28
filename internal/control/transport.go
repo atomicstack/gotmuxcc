@@ -58,6 +58,9 @@ func New(ctx context.Context, cfg Config) (*Transport, error) {
 		args = append(args, "-S", cfg.SocketPath)
 	}
 	args = append(args, cfg.ExtraArgs...)
+	// Avoid tmux's default `new-session`; start-server keeps the connection
+	// alive without creating throwaway sessions.
+	args = append(args, "start-server")
 
 	cmd := exec.CommandContext(ctx, bin, args...)
 	if len(cfg.Env) > 0 {
