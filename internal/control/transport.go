@@ -101,7 +101,7 @@ func New(ctx context.Context, cfg Config) (*Transport, error) {
 		scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
 		for scanner.Scan() {
 			text := scanner.Text()
-			trace.Printf("transport", "stdout line=%s", trace.Snippet(text))
+			trace.Printf("transport", "recv <- %s", trace.FormatControlLine(text))
 			select {
 			case t.lines <- text:
 			case <-ctx.Done():
@@ -120,8 +120,9 @@ func New(ctx context.Context, cfg Config) (*Transport, error) {
 		defer wg.Done()
 		slurp, _ := io.ReadAll(stderr)
 		if len(slurp) > 0 {
-			t.finish(errors.New(strings.TrimSpace(string(slurp))))
-			trace.Printf("transport", "stderr captured=%s", trace.Snippet(string(slurp)))
+			payload := strings.TrimSpace(string(slurp))
+			t.finish(errors.New(payload))
+			trace.Printf("transport", "stderr=%s", trace.FormatControlLine(payload))
 		}
 	}()
 
@@ -147,6 +148,8 @@ func (t *Transport) Send(line string) error {
 		return errors.New("control: transport is nil")
 	}
 
+	display := trace.FormatControlCommand(line)
+
 	t.sendMu.Lock()
 	defer t.sendMu.Unlock()
 
@@ -162,7 +165,7 @@ func (t *Transport) Send(line string) error {
 		line += "\n"
 	}
 
-	trace.Printf("transport", "Send line=%s", trace.Snippet(line))
+	trace.Printf("transport", "send -> %s", display)
 
 	if _, err := io.WriteString(t.stdin, line); err != nil {
 		return fmt.Errorf("control: send failed: %w", err)

@@ -92,7 +92,7 @@ func getWriter() io.Writer {
 	writerOnce.Do(func() {
 		path := strings.TrimSpace(os.Getenv("GOTMUXCC_TRACE_FILE"))
 		if path == "" {
-			path = "trace.log"
+			path = "gotmuxcc_trace.log"
 		}
 
 		resolved, err := resolvePath(path)

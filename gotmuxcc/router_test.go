@@ -180,7 +180,7 @@ func TestRouterRemoveFromStackNonTail(t *testing.T) {
 		events: make(chan Event, 1),
 	}
 
-	r.finishCommand("2", "1", "0", nil)
+	r.finishCommand("2", "1", "0", nil, "")
 	result, err := req.wait()
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)

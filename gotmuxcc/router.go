@@ -148,7 +148,6 @@ func (r *router) readLoop() {
 	}
 	for line := range lines {
 		line = strings.TrimRight(line, "\r\n")
-		trace.Printf("router", "readLoop received line=%s", trace.Snippet(line))
 		r.handleLine(line)
 	}
 	trace.Printf("router", "readLoop lines channel closed")
@@ -186,8 +185,6 @@ func (r *router) handleBegin(line string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	trace.Printf("router", "handleBegin number=%s time=%s flags=%s pending=%d err=%v", number, timeStr, flags, len(r.pending), r.err)
-
 	if r.err != nil {
 		return
 	}
@@ -208,6 +205,7 @@ func (r *router) handleBegin(line string) {
 	}
 	r.inflight[number] = state
 	r.stack = append(r.stack, number)
+	trace.Printf("router", "begin <- #%s time=%s flags=%s command=%s", number, timeStr, flags, trace.FormatControlCommand(req.command))
 }
 
 func (r *router) handleEnd(line string) {
@@ -216,8 +214,7 @@ func (r *router) handleEnd(line string) {
 		r.emitEvent(eventForError("malformed-end", line, err))
 		return
 	}
-	trace.Printf("router", "handleEnd number=%s time=%s flags=%s", number, timeStr, flags)
-	r.finishCommand(number, timeStr, flags, nil)
+	r.finishCommand(number, timeStr, flags, nil, "")
 }
 
 func (r *router) handleError(line string) {
@@ -229,8 +226,7 @@ func (r *router) handleError(line string) {
 	if rest == "" {
 		rest = "tmux reported an error"
 	}
-	trace.Printf("router", "handleError number=%s time=%s flags=%s msg=%s", number, timeStr, flags, trace.Snippet(rest))
-	r.finishCommand(number, timeStr, flags, errors.New(rest))
+	r.finishCommand(number, timeStr, flags, errors.New(rest), rest)
 }
 
 func (r *router) appendOutput(line string) {
@@ -248,7 +244,7 @@ func (r *router) appendOutput(line string) {
 			Data:   line,
 			Raw:    line,
 		})
-		trace.Printf("router", "appendOutput orphan line=%s", trace.Snippet(line))
+		trace.Printf("router", "orphan output <- %s", trace.FormatControlLine(line))
 		return
 	}
 
@@ -261,15 +257,14 @@ func (r *router) appendOutput(line string) {
 			Data:   line,
 			Raw:    line,
 		})
-		trace.Printf("router", "appendOutput unknown-command number=%s line=%s", current, trace.Snippet(line))
+		trace.Printf("router", "unknown output <- #%s %s", current, trace.FormatControlLine(line))
 		return
 	}
 
 	state.output = append(state.output, line)
-	trace.Printf("router", "appendOutput number=%s stored line=%s total=%d", current, trace.Snippet(line), len(state.output))
 }
 
-func (r *router) finishCommand(number, timeStr, flags string, cmdErr error) {
+func (r *router) finishCommand(number, timeStr, flags string, cmdErr error, detail string) {
 	var state *commandState
 
 	r.mu.Lock()
@@ -283,7 +278,8 @@ func (r *router) finishCommand(number, timeStr, flags string, cmdErr error) {
 		delete(r.inflight, number)
 		r.removeFromStack(number)
 	}
-	trace.Printf("router", "finishCommand number=%s pending=%d inflight=%d err=%v", number, len(r.pending), len(r.inflight), cmdErr)
+	pendingCount := len(r.pending)
+	inflightCount := len(r.inflight)
 	r.mu.Unlock()
 
 	if state == nil {
@@ -292,7 +288,7 @@ func (r *router) finishCommand(number, timeStr, flags string, cmdErr error) {
 		} else {
 			r.emitEvent(eventForError("unexpected-end", number, errUnexpectedEnd))
 		}
-		trace.Printf("router", "finishCommand missing state number=%s err=%v", number, cmdErr)
+		trace.Printf("router", "missing state for #%s err=%v (pending=%d inflight=%d)", number, cmdErr, pendingCount, inflightCount)
 		return
 	}
 
@@ -304,18 +300,25 @@ func (r *router) finishCommand(number, timeStr, flags string, cmdErr error) {
 		Lines:   append([]string(nil), state.output...),
 	}
 
+	commandDisplay := trace.FormatControlCommand(state.request.command)
+	summary := trace.SummariseControlLines(result.Lines)
+
 	if cmdErr != nil {
+		msg := detail
+		if msg == "" {
+			msg = cmdErr.Error()
+		}
+		trace.Printf("router", "error <- #%s time=%s flags=%s command=%s msg=%s %s", number, timeStr, flags, commandDisplay, trace.FormatControlLine(msg), summary)
 		state.request.fail(&commandError{
 			Command: state.request.command,
 			Message: cmdErr.Error(),
 			Result:  result,
 		})
-		trace.Printf("router", "finishCommand failed command=%s err=%v", state.request.command, cmdErr)
 		return
 	}
 
+	trace.Printf("router", "complete <- #%s time=%s flags=%s command=%s %s", number, timeStr, flags, commandDisplay, summary)
 	state.request.complete(result)
-	trace.Printf("router", "finishCommand completed command=%s lines=%d", state.request.command, len(result.Lines))
 }
 
 func (r *router) removeFromStack(number string) {
@@ -340,7 +343,7 @@ func (r *router) removeFromStack(number string) {
 func (r *router) emitEvent(evt Event) {
 	select {
 	case r.events <- evt:
-		trace.Printf("router", "emitEvent name=%s data=%s", evt.Name, trace.Snippet(evt.Data))
+		trace.Printf("router", "event <- %s data=%s", evt.Name, trace.FormatControlLine(evt.Data))
 	default:
 		trace.Printf("router", "emitEvent dropped name=%s", evt.Name)
 		// Drop event to avoid blocking; router consumers should drain events when needed.
@@ -387,11 +390,11 @@ func (r *router) enqueue(req *commandRequest) error {
 	if r.err != nil {
 		err := r.err
 		r.mu.Unlock()
-		trace.Printf("router", "enqueue rejected command=%s err=%v", req.command, err)
+		trace.Printf("router", "reject -> %s err=%v", trace.FormatControlCommand(req.command), err)
 		return err
 	}
 	r.pending = append(r.pending, req)
-	trace.Printf("router", "enqueue command=%s pending=%d", trace.Snippet(req.command), len(r.pending))
+	trace.Printf("router", "queued -> %s (pending=%d)", trace.FormatControlCommand(req.command), len(r.pending))
 	r.mu.Unlock()
 
 	if err := r.transport.Send(req.command); err != nil {
@@ -402,7 +405,7 @@ func (r *router) enqueue(req *commandRequest) error {
 				break
 			}
 		}
-		trace.Printf("router", "enqueue send failed command=%s err=%v", trace.Snippet(req.command), err)
+		trace.Printf("router", "send failed -> %s err=%v", trace.FormatControlCommand(req.command), err)
 		r.mu.Unlock()
 		return err
 	}
@@ -415,7 +418,7 @@ func (r *router) runCommand(cmd string) (commandResult, error) {
 		return commandResult{}, errEmptyCommand
 	}
 
-	trace.Printf("router", "runCommand command=%s", trace.Snippet(cmd))
+	trace.Printf("router", "dispatch -> %s", trace.FormatControlCommand(cmd))
 
 	req := newCommandRequest(cmd)
 	if err := r.enqueue(req); err != nil {

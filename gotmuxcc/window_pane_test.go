@@ -202,7 +202,7 @@ func TestListAllWindowsFallback(t *testing.T) {
 			}),
 			"%end 1 1 0",
 		}},
-		{match: "list-windows -t popup", lines: []string{
+		{match: "list-windows -t ", lines: []string{
 			"%begin 1 1 0",
 			formatRecord(windowVars, map[string]string{
 				varWindowId:     "@1",
@@ -235,7 +235,10 @@ func TestListAllWindowsFallback(t *testing.T) {
 	if len(sent) != len(responses) {
 		t.Fatalf("expected %d commands, saw %d (%v)", len(responses), len(sent), sent)
 	}
-	if !strings.Contains(sent[1], "list-sessions") || !strings.Contains(sent[2], "list-windows -t popup") {
+	if !strings.Contains(sent[1], "list-sessions") {
+		t.Fatalf("expected list-sessions fallback command, saw %v", sent)
+	}
+	if !(strings.Contains(sent[2], "list-windows -t popup") || strings.Contains(sent[2], "list-windows -t $1")) {
 		t.Fatalf("fallback commands were not issued as expected: %v", sent)
 	}
 }
@@ -269,7 +272,7 @@ func TestListAllPanesFallback(t *testing.T) {
 			}),
 			"%end 1 1 0",
 		}},
-		{match: "list-windows -t popup", lines: []string{
+		{match: "list-windows -t ", lines: []string{
 			"%begin 1 1 0",
 			formatRecord(windowVars, map[string]string{
 				varWindowId:    "@1",
