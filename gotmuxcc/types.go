@@ -262,4 +262,16 @@ type CaptureOptions struct {
 	IgnoreTrailing   bool
 	PreserveTrailing bool
 	PreserveAndJoin  bool
+	StartLine        string // -S flag (e.g. "-40", "0", "-"); empty means default
+	EndLine          string // -E flag (e.g. "-1", "-"); empty means default
 }
+
+// ResizeDirection enumerates resize-pane directions.
+type ResizeDirection string
+
+const (
+	ResizeLeft  ResizeDirection = "-L"
+	ResizeRight ResizeDirection = "-R"
+	ResizeUp    ResizeDirection = "-U"
+	ResizeDown  ResizeDirection = "-D"
+)

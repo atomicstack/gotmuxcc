@@ -169,6 +169,58 @@ func (w *Window) Move(targetSession string, targetIdx int) error {
 	return nil
 }
 
+// Unlink unlinks this window from the session. If the window is linked to
+// multiple sessions it is removed from the current one; -k kills it even
+// if it is the last link.
+func (w *Window) Unlink() error {
+	_, err := w.tmux.query().
+		cmd("unlink-window").
+		fargs("-k", "-t", w.Id).
+		run()
+	if err != nil {
+		return fmt.Errorf("failed to unlink window: %w", err)
+	}
+	return nil
+}
+
+// Link links this window into targetSession, appending it after the last
+// window in that session.
+func (w *Window) Link(targetSession string) error {
+	_, err := w.tmux.query().
+		cmd("link-window").
+		fargs("-a", "-s", w.Id, "-t", targetSession).
+		run()
+	if err != nil {
+		return fmt.Errorf("failed to link window: %w", err)
+	}
+	return nil
+}
+
+// MoveToSession moves this window to targetSession, appending it after
+// the last window. Unlike Move(), this uses -a for append semantics.
+func (w *Window) MoveToSession(targetSession string) error {
+	_, err := w.tmux.query().
+		cmd("move-window").
+		fargs("-a", "-s", w.Id, "-t", targetSession).
+		run()
+	if err != nil {
+		return fmt.Errorf("failed to move window to session: %w", err)
+	}
+	return nil
+}
+
+// Swap swaps this window with another window.
+func (w *Window) Swap(target string) error {
+	_, err := w.tmux.query().
+		cmd("swap-window").
+		fargs("-s", w.Id, "-t", target).
+		run()
+	if err != nil {
+		return fmt.Errorf("failed to swap window: %w", err)
+	}
+	return nil
+}
+
 // ListLinkedSessions returns sessions linked to this window.
 func (w *Window) ListLinkedSessions() ([]*Session, error) {
 	sessions := make([]*Session, 0, len(w.LinkedSessionsList))
@@ -491,6 +543,154 @@ func (s *Session) PreviousWindow() error {
 		run()
 	if err != nil {
 		return fmt.Errorf("failed to select previous window: %w", err)
+	}
+	return nil
+}
+
+// UnlinkWindow unlinks a window by target string.
+func (t *Tmux) UnlinkWindow(target string) error {
+	_, err := t.query().
+		cmd("unlink-window").
+		fargs("-k", "-t", target).
+		run()
+	if err != nil {
+		return fmt.Errorf("failed to unlink window: %w", err)
+	}
+	return nil
+}
+
+// LinkWindow links a source window into a target session, appending it.
+func (t *Tmux) LinkWindow(source, targetSession string) error {
+	_, err := t.query().
+		cmd("link-window").
+		fargs("-a", "-s", source, "-t", targetSession).
+		run()
+	if err != nil {
+		return fmt.Errorf("failed to link window: %w", err)
+	}
+	return nil
+}
+
+// MoveWindowToSession moves a source window to a target session, appending it.
+func (t *Tmux) MoveWindowToSession(source, targetSession string) error {
+	_, err := t.query().
+		cmd("move-window").
+		fargs("-a", "-s", source, "-t", targetSession).
+		run()
+	if err != nil {
+		return fmt.Errorf("failed to move window: %w", err)
+	}
+	return nil
+}
+
+// SwapWindows swaps two windows by target strings.
+func (t *Tmux) SwapWindows(first, second string) error {
+	_, err := t.query().
+		cmd("swap-window").
+		fargs("-s", first, "-t", second).
+		run()
+	if err != nil {
+		return fmt.Errorf("failed to swap windows: %w", err)
+	}
+	return nil
+}
+
+// SwapPanes swaps two panes by target strings.
+func (t *Tmux) SwapPanes(first, second string) error {
+	_, err := t.query().
+		cmd("swap-pane").
+		fargs("-s", first, "-t", second).
+		run()
+	if err != nil {
+		return fmt.Errorf("failed to swap panes: %w", err)
+	}
+	return nil
+}
+
+// MovePane moves a source pane to a target location.
+func (t *Tmux) MovePane(source, target string) error {
+	q := t.query().
+		cmd("move-pane").
+		fargs("-s", source)
+	if target != "" {
+		q.fargs("-t", target)
+	}
+	if _, err := q.run(); err != nil {
+		return fmt.Errorf("failed to move pane: %w", err)
+	}
+	return nil
+}
+
+// BreakPane breaks a pane out into a new window.
+func (t *Tmux) BreakPane(source, destination string) error {
+	q := t.query().
+		cmd("break-pane").
+		fargs("-s", source)
+	if destination != "" {
+		q.fargs("-t", destination)
+	}
+	if _, err := q.run(); err != nil {
+		return fmt.Errorf("failed to break pane: %w", err)
+	}
+	return nil
+}
+
+// JoinPane moves source pane into target window as a split.
+func (t *Tmux) JoinPane(source, target string) error {
+	_, err := t.query().
+		cmd("join-pane").
+		fargs("-s", source, "-t", target).
+		run()
+	if err != nil {
+		return fmt.Errorf("failed to join pane: %w", err)
+	}
+	return nil
+}
+
+// ResizePane resizes a pane by target string.
+func (t *Tmux) ResizePane(target string, direction ResizeDirection, amount int) error {
+	_, err := t.query().
+		cmd("resize-pane").
+		fargs("-t", target, string(direction), fmt.Sprintf("%d", amount)).
+		run()
+	if err != nil {
+		return fmt.Errorf("failed to resize pane: %w", err)
+	}
+	return nil
+}
+
+// RenamePane sets a pane's title via select-pane -T.
+func (t *Tmux) RenamePane(target, title string) error {
+	_, err := t.query().
+		cmd("select-pane").
+		fargs("-t", target, "-T", title).
+		run()
+	if err != nil {
+		return fmt.Errorf("failed to rename pane: %w", err)
+	}
+	return nil
+}
+
+// SelectPane selects a pane by target string.
+func (t *Tmux) SelectPane(target string) error {
+	_, err := t.query().
+		cmd("select-pane").
+		fargs("-t", target).
+		run()
+	if err != nil {
+		return fmt.Errorf("failed to select pane: %w", err)
+	}
+	return nil
+}
+
+// SelectWindow selects a window by target string.
+func (t *Tmux) SelectWindow(target string) error {
+	_, err := t.query().
+		cmd("select-window").
+		fargs("-t", target).
+		run()
+	if err != nil {
+		return fmt.Errorf("failed to select window: %w", err)
 	}
 	return nil
 }

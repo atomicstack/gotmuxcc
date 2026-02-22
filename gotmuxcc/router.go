@@ -18,6 +18,9 @@ var (
 
 	// ErrTransportClosed indicates the underlying control transport terminated.
 	ErrTransportClosed = errors.New("gotmuxcc: control transport closed")
+
+	// ErrServerExit indicates the tmux server sent a %exit notification.
+	ErrServerExit = errors.New("gotmuxcc: server sent %exit")
 )
 
 // Event represents an asynchronous notification emitted by tmux control mode.
@@ -169,6 +172,8 @@ func (r *router) handleLine(line string) {
 		r.handleEnd(line)
 	case strings.HasPrefix(line, "%error"):
 		r.handleError(line)
+	case strings.HasPrefix(line, "%exit"):
+		r.handleExit(line)
 	case strings.HasPrefix(line, "%"):
 		r.emitEvent(parseEvent(line))
 	default:
@@ -228,6 +233,38 @@ func (r *router) handleError(line string) {
 		rest = "tmux reported an error"
 	}
 	r.finishCommand(number, timeStr, flags, errors.New(rest), rest)
+}
+
+func (r *router) handleExit(line string) {
+	reason := ""
+	if trimmed := strings.TrimPrefix(line, "%exit"); len(trimmed) > 0 {
+		reason = strings.TrimSpace(trimmed)
+	}
+	trace.Printf("router", "exit <- reason=%q", reason)
+
+	// Emit the exit event before shutting down so callers can observe it.
+	r.emitEvent(parseEvent(line))
+
+	// Fail all pending/inflight commands with an ExitError.
+	r.failAll(&ExitError{Reason: reason})
+}
+
+// ExitError is returned when tmux sends a %exit notification. The Reason
+// field contains the optional reason string from the notification.
+type ExitError struct {
+	Reason string
+}
+
+func (e *ExitError) Error() string {
+	if e.Reason != "" {
+		return fmt.Sprintf("gotmuxcc: server sent %%exit: %s", e.Reason)
+	}
+	return ErrServerExit.Error()
+}
+
+// Is reports whether target matches ErrServerExit.
+func (e *ExitError) Is(target error) bool {
+	return target == ErrServerExit
 }
 
 func (r *router) appendOutput(line string) {

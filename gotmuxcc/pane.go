@@ -72,6 +72,12 @@ func (t *Tmux) CapturePane(target string, op *CaptureOptions) (string, error) {
 		if op.PreserveAndJoin {
 			q.fargs("-J")
 		}
+		if op.StartLine != "" {
+			q.fargs("-S", op.StartLine)
+		}
+		if op.EndLine != "" {
+			q.fargs("-E", op.EndLine)
+		}
 	}
 
 	output, err := q.run()
@@ -254,6 +260,85 @@ func (p *Pane) ChooseTree(op *ChooseTreeOptions) error {
 
 	if _, err := q.run(); err != nil {
 		return fmt.Errorf("failed to enter choose-tree: %w", err)
+	}
+	return nil
+}
+
+// Rename sets the pane's title via select-pane -T.
+func (p *Pane) Rename(title string) error {
+	_, err := p.tmux.query().
+		cmd("select-pane").
+		fargs("-t", p.Id, "-T", title).
+		run()
+	if err != nil {
+		return fmt.Errorf("failed to rename pane: %w", err)
+	}
+	return nil
+}
+
+// Swap swaps this pane with another pane.
+func (p *Pane) Swap(target string) error {
+	_, err := p.tmux.query().
+		cmd("swap-pane").
+		fargs("-s", p.Id, "-t", target).
+		run()
+	if err != nil {
+		return fmt.Errorf("failed to swap pane: %w", err)
+	}
+	return nil
+}
+
+// Move moves this pane to another target (window or pane position).
+// If target is empty, tmux uses the default target.
+func (p *Pane) Move(target string) error {
+	q := p.tmux.query().
+		cmd("move-pane").
+		fargs("-s", p.Id)
+	if target != "" {
+		q.fargs("-t", target)
+	}
+	if _, err := q.run(); err != nil {
+		return fmt.Errorf("failed to move pane: %w", err)
+	}
+	return nil
+}
+
+// Break breaks this pane out into a new window.
+// If destination is empty, the pane becomes a window in the current session.
+func (p *Pane) Break(destination string) error {
+	q := p.tmux.query().
+		cmd("break-pane").
+		fargs("-s", p.Id)
+	if destination != "" {
+		q.fargs("-t", destination)
+	}
+	if _, err := q.run(); err != nil {
+		return fmt.Errorf("failed to break pane: %w", err)
+	}
+	return nil
+}
+
+// Join moves this pane into the target window as a split.
+// This is equivalent to join-pane -s <this> -t <target>.
+func (p *Pane) Join(target string) error {
+	_, err := p.tmux.query().
+		cmd("join-pane").
+		fargs("-s", p.Id, "-t", target).
+		run()
+	if err != nil {
+		return fmt.Errorf("failed to join pane: %w", err)
+	}
+	return nil
+}
+
+// Resize resizes the pane in the given direction by amount cells.
+func (p *Pane) Resize(direction ResizeDirection, amount int) error {
+	_, err := p.tmux.query().
+		cmd("resize-pane").
+		fargs("-t", p.Id, string(direction), fmt.Sprintf("%d", amount)).
+		run()
+	if err != nil {
+		return fmt.Errorf("failed to resize pane: %w", err)
 	}
 	return nil
 }
