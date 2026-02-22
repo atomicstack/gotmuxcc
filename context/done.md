@@ -86,3 +86,50 @@ Here’s what’s happened so far:
   polling frequency and avoid flooding the backend with repeated queries.
 - Added an end-to-end tmux integration scenario that renames windows, splits
   panes, sends commands, and asserts session/window/pane state through the API.
+- Performed a gap analysis between gotmuxcc and tmux's control-mode API surface
+  by reading the tmux C source (control.c, control-notify.c, cmd-refresh-client.c,
+  etc.) and cataloguing every missing feature.
+- Implemented tmux control-mode subscriptions (`refresh-client -B`): Subscribe()
+  and Unsubscribe() methods with support for session, pane, window, all-panes,
+  and all-windows subscription targets (subscription.go).
+- Implemented control client window sizing (`refresh-client -C`): SetClientSize(),
+  SetWindowSize(), and ClearWindowSize() methods (refresh.go).
+- Implemented `%exit` notification handling in the router: the router now
+  intercepts `%exit`, emits an exit event, and fails all pending/inflight
+  commands with a typed ExitError that supports errors.Is(err, ErrServerExit).
+- Implemented octal escape decoding for `%output` notification data: decodeOctal()
+  handles tmux's \xxx encoding of non-printable bytes and backslashes (octal.go).
+- Added 24 typed notification structs (notification.go) covering every tmux
+  control-mode notification: OutputNotification (with octal decoding),
+  ExtendedOutputNotification, LayoutChangeNotification,
+  SubscriptionChangedNotification, SessionChangedNotification,
+  SessionRenamedNotification, SessionWindowChangedNotification,
+  WindowAddNotification, WindowCloseNotification, WindowRenamedNotification,
+  WindowPaneChangedNotification, UnlinkedWindow* variants,
+  PaneModeChangedNotification, ClientSessionChangedNotification,
+  ClientDetachedNotification, SessionsChangedNotification,
+  PasteBuffer{Changed,Deleted}Notification, Pause/ContinueNotification,
+  ConfigErrorNotification, MessageNotification, ExitNotification.
+  Event.Notification() parses from Raw to correctly handle notifications with
+  spaces in data payloads and colon-separated values.
+- Added missing pane operations: Pane.Rename(), Swap(), Move(), Break(), Join(),
+  Resize() plus top-level Tmux.RenamePane(), SwapPanes(), MovePane(), BreakPane(),
+  JoinPane(), ResizePane(), SelectPane() methods.
+- Added missing window operations: Window.Unlink(), Link(), MoveToSession(),
+  Swap() plus top-level Tmux.UnlinkWindow(), LinkWindow(), MoveWindowToSession(),
+  SwapWindows(), SelectWindow() methods.
+- Added Tmux.DisplayMessage(target, format) for arbitrary format string evaluation
+  via `display-message -p`, enabling CurrentClientID and similar queries.
+- Extended CaptureOptions with StartLine and EndLine fields mapping to
+  capture-pane -S/-E flags for scrollback capture.
+- Added custom format list methods: Tmux.ListSessionsFormat(),
+  ListWindowsFormat(), ListPanesFormat() accepting arbitrary -F format strings
+  and optional -f filters, returning raw []string results for consumer code that
+  uses env-var-driven custom format strings.
+- Implemented flow control (refresh-client -f/-A): SetControlFlags() for
+  arbitrary flag strings, EnablePauseAfter()/DisablePauseAfter() convenience
+  methods, and per-pane output control via SetPaneOutput(),
+  EnablePaneOutput(), DisablePaneOutput(), PausePaneOutput(),
+  ContinuePaneOutput(), SetMultiplePaneOutputs() for batch operations.
+- Implemented pane color reports (refresh-client -r): ReportPaneColors() relays
+  terminal color query responses (OSC 10/11) back to tmux for specific panes.
