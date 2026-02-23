@@ -87,6 +87,76 @@ func TestListSessionsFormat(t *testing.T) {
 	}
 }
 
+func TestListSessionsFormatQuotesWhitespace(t *testing.T) {
+	ft := newFakeTransport()
+	r := newRouter(ft)
+	defer r.close()
+
+	tmux := &Tmux{transport: ft, router: r}
+
+	go func() {
+		cmd := <-ft.sendC
+		// Format contains a tab, so it must be single-quoted
+		if !strings.Contains(cmd, "'#{session_name}\t#{session_windows}'") {
+			t.Errorf("format with whitespace should be quoted: %s", cmd)
+		}
+		ft.lines <- "%begin 1 1 0"
+		ft.lines <- "%end 1 1 0"
+	}()
+
+	_, err := tmux.ListSessionsFormat("#{session_name}\t#{session_windows}")
+	if err != nil {
+		t.Fatalf("ListSessionsFormat returned error: %v", err)
+	}
+}
+
+func TestDisplayMessageQuotesFormat(t *testing.T) {
+	ft := newFakeTransport()
+	r := newRouter(ft)
+	defer r.close()
+
+	tmux := &Tmux{transport: ft, router: r}
+
+	go func() {
+		cmd := <-ft.sendC
+		// Format with space must be quoted
+		if !strings.Contains(cmd, "'#S: #{session_windows} windows'") {
+			t.Errorf("format with space should be quoted: %s", cmd)
+		}
+		ft.lines <- "%begin 1 1 0"
+		ft.lines <- "main: 3 windows"
+		ft.lines <- "%end 1 1 0"
+	}()
+
+	_, err := tmux.DisplayMessage("", "#S: #{session_windows} windows")
+	if err != nil {
+		t.Fatalf("DisplayMessage returned error: %v", err)
+	}
+}
+
+func TestListWindowsFormatQuotesFilter(t *testing.T) {
+	ft := newFakeTransport()
+	r := newRouter(ft)
+	defer r.close()
+
+	tmux := &Tmux{transport: ft, router: r}
+
+	go func() {
+		cmd := <-ft.sendC
+		// Filter with spaces must be quoted
+		if !strings.Contains(cmd, "-f '#{window_name} == bash'") {
+			t.Errorf("filter with spaces should be quoted: %s", cmd)
+		}
+		ft.lines <- "%begin 1 1 0"
+		ft.lines <- "%end 1 1 0"
+	}()
+
+	_, err := tmux.ListWindowsFormat("", "#{window_name} == bash", "#{window_id}")
+	if err != nil {
+		t.Fatalf("ListWindowsFormat returned error: %v", err)
+	}
+}
+
 func TestListWindowsFormatAll(t *testing.T) {
 	ft := newFakeTransport()
 	r := newRouter(ft)
