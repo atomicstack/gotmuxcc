@@ -1,27 +1,43 @@
 gotmuxcc
 ========
 
-`gotmuxcc` is a work-in-progress replacement for
+`gotmuxcc` is a drop-in replacement for
 [`github.com/GianlucaP106/gotmux`](https://github.com/GianlucaP106/gotmux).
 It mirrors the public API of the original library while internally using a
-persistent tmux control-mode connection instead of spawning a new `tmux`
-process for every command. This greatly reduces overhead when issuing many
-tmux operations from Go.
+persistent tmux control-mode (`tmux -C`) connection instead of spawning a new
+`tmux` process for every command. This dramatically reduces overhead when
+issuing many tmux operations from Go.
 
-## Status
+## Features
 
-- Public structs and method signatures are kept compatible with gotmux.
-- Session, window, pane, and option helpers are fully backed by the control
-  transport.
-- Control-mode router, query builder, and transport management are complete.
-- Integration tests cover server info, client listing, and session lifecycle.
-
-Remaining work includes enhanced documentation, expanded integration tests, and
-final parity checks.
+- **API-compatible with gotmux** — public structs, method signatures, and
+  return types match the original library so switching requires only a module
+  path change.
+- **Persistent control-mode connection** — a single `tmux -C` subprocess is
+  kept alive for the lifetime of the `Tmux` handle; all commands flow over
+  stdin/stdout pipes.
+- **Concurrency-safe router** — commands are dispatched, correlated with
+  `%begin/%end/%error` frames, and returned to callers without external
+  locking.
+- **24 typed notification structs** — every tmux control-mode notification
+  (`%output`, `%layout-change`, `%session-changed`, etc.) is parsed into a
+  concrete Go type via `Event.Notification()`.
+- **Subscriptions** — `Subscribe`/`Unsubscribe` wrappers for
+  `refresh-client -B` with helpers for session, window, and pane targets.
+- **Flow control** — pause-after mode, per-pane output control, and arbitrary
+  control flag management via `SetControlFlags`.
+- **Client & window sizing** — `SetClientSize`, `SetWindowSize`, and
+  `ClearWindowSize` for programmatic layout control.
+- **Custom format queries** — `ListSessionsFormat`, `ListWindowsFormat`, and
+  `ListPanesFormat` accept arbitrary `-F` format strings and `-f` filters.
+- **Debug tracing** — set `GOTMUXCC_TRACE=1` (or component names like
+  `router,transport`) to write structured debug logs to a trace file.
 
 ## Getting Started
 
-Install the module in a Go project:
+Requires Go 1.22+ and a working tmux installation.
+
+Install the module:
 
 ```bash
 go get github.com/atomicstack/gotmuxcc/gotmuxcc
@@ -57,28 +73,54 @@ func main() {
 To point at a custom socket:
 
 ```go
-client, err := gotmuxcc.NewTmux("/path/to/socket")
+tmux, err := gotmuxcc.NewTmux("/path/to/socket")
 ```
+
+## Architecture
+
+The library is organized into five layers (top to bottom):
+
+| Layer | Package | Responsibility |
+|-------|---------|----------------|
+| Public API | `gotmuxcc/` | `Tmux`, `Session`, `Window`, `Pane` types that mirror gotmux |
+| Query Builder | `gotmuxcc/query.go` | Fluent command assembly with `#{...}` format variables |
+| Router | `gotmuxcc/router.go` | Concurrency-safe dispatch, frame parsing, event streaming |
+| Control Bridge | `gotmuxcc/control_bridge.go` | Wires the transport interface to the concrete implementation |
+| Control Transport | `internal/control/` | Launches and manages the `tmux -C` subprocess |
+
+The `controlTransport` interface (defined in `gotmuxcc/tmux.go`) abstracts the
+tmux pipe. In production it is satisfied by `internal/control.Transport`; in
+tests it is replaced by fake or recording transports injected via
+`WithDialer()`.
 
 ## Testing
 
-Integration tests require tmux to be installed and able to create UNIX socket
-files in the test temporary directory. See `docs/testing.md` for details and for
-instructions on running the test suite inside restricted sandboxes. The helper
-scripts in `scripts/` can be used to separate fast and full runs:
+Unit tests use fake control transports and do not require tmux:
 
 ```bash
-# Fast unit tests only
-scripts/test-unit.sh
-
-# Full suite including integration specs (requires tmux)
-scripts/test-integration.sh
+make unit
 ```
+
+Integration tests spin up isolated tmux servers with temporary sockets and
+require tmux to be installed:
+
+```bash
+make integration
+```
+
+Other targets:
+
+```bash
+make cover   # Generate coverage report to coverage.out
+make clean   # Remove local .gocache and .gomodcache
+```
+
+See `docs/testing.md` for details on running tests inside restricted sandboxes.
 
 ## Documentation
 
-- API inventory mirroring gotmux: `docs/api_inventory.md`
-- Test guidance: `docs/testing.md`
+- `docs/api_inventory.md` — one-to-one API compatibility catalog with gotmux
+- `docs/testing.md` — test prerequisites, integration test setup, coverage notes
 
 ## License
 
