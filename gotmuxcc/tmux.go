@@ -67,6 +67,8 @@ func DefaultTmux() (*Tmux, error) {
 }
 
 // NewTmuxWithOptions creates a Tmux client with custom constructor options.
+// It blocks until the initial control-mode handshake completes so that
+// subsequent commands are not affected by the startup %begin/%end pair.
 func NewTmuxWithOptions(socketPath string, opts ...ConstructorOption) (*Tmux, error) {
 	cfg := constructorConfig{
 		ctx:    context.Background(),
@@ -94,6 +96,17 @@ func NewTmuxWithOptions(socketPath string, opts ...ConstructorOption) (*Tmux, er
 		t.Socket = socket
 	}
 	t.router = newRouter(transport)
+
+	// Wait for the initial %begin/%end from the attach/new-session to
+	// be consumed so that the first user command isn't mismatched.
+	select {
+	case <-t.router.ready:
+	case <-t.router.closed:
+	case <-cfg.ctx.Done():
+		_ = transport.Close()
+		return nil, cfg.ctx.Err()
+	}
+
 	return t, nil
 }
 

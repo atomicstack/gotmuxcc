@@ -58,7 +58,7 @@ func (f *fakeTransport) Close() error {
 
 func TestRouterRunCommandSuccess(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	go func() {
@@ -79,7 +79,7 @@ func TestRouterRunCommandSuccess(t *testing.T) {
 
 func TestRouterRunCommandError(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	go func() {
@@ -104,7 +104,7 @@ func TestRouterRunCommandError(t *testing.T) {
 
 func TestRouterEmitsEvents(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	go func() {
@@ -151,6 +151,7 @@ func TestRouterEnqueueSendError(t *testing.T) {
 		inflight:  make(map[string]*commandState),
 		events:    make(chan Event, 1),
 		closed:    make(chan struct{}),
+		ready:     make(chan struct{}),
 	}
 
 	if _, err := r.runCommand("list-sessions"); !errors.Is(err, sendErr) {
@@ -178,6 +179,7 @@ func TestRouterRemoveFromStackNonTail(t *testing.T) {
 		},
 		stack:  []string{"1", "2", "3"},
 		events: make(chan Event, 1),
+		ready:  make(chan struct{}),
 	}
 
 	r.finishCommand("2", "1", "0", nil, "")
@@ -197,6 +199,7 @@ func TestRouterAppendOutputEdgeCases(t *testing.T) {
 	r := &router{
 		inflight: make(map[string]*commandState),
 		events:   make(chan Event, 2),
+		ready:    make(chan struct{}),
 	}
 
 	r.appendOutput("orphan")
@@ -225,6 +228,7 @@ func TestRouterUnexpectedEndEmitsErrorEvent(t *testing.T) {
 	r := &router{
 		inflight: make(map[string]*commandState),
 		events:   make(chan Event, 1),
+		ready:    make(chan struct{}),
 	}
 
 	r.handleEnd("%end 100 9 0")
@@ -248,5 +252,93 @@ func TestEventForError(t *testing.T) {
 	}
 	if evt.Data != "fail" || evt.Raw != "%line" {
 		t.Fatalf("unexpected data/raw: %q / %q", evt.Data, evt.Raw)
+	}
+}
+
+func TestRouterInitialCommandAbsorbed(t *testing.T) {
+	ft := newFakeTransport()
+	// Simulate the initial attach-session %begin/%end arriving before
+	// any user command is enqueued.
+	ft.lines <- "%begin 1712000000 0 0"
+	ft.lines <- "%end 1712000000 0 0"
+
+	r := newRouter(ft)
+	defer r.close()
+
+	// ready should be closed once the initial pair is consumed.
+	<-r.ready
+
+	// Now send a real command — it should not be affected by the initial pair.
+	go func() {
+		<-ft.sendC
+		ft.lines <- "%begin 1712000001 1 0"
+		ft.lines <- "line1"
+		ft.lines <- "line2"
+		ft.lines <- "%end 1712000001 1 0"
+	}()
+
+	result, err := r.runCommand("list-commands")
+	if err != nil {
+		t.Fatalf("runCommand returned error: %v", err)
+	}
+	if len(result.Lines) != 2 || result.Lines[0] != "line1" || result.Lines[1] != "line2" {
+		t.Fatalf("unexpected result lines: %#v", result.Lines)
+	}
+}
+
+func TestRouterInitialCommandWithOutput(t *testing.T) {
+	ft := newFakeTransport()
+	// Initial attach may produce output lines between %begin/%end.
+	ft.lines <- "%begin 1712000000 0 0"
+	ft.lines <- "session created"
+	ft.lines <- "%end 1712000000 0 0"
+
+	r := newRouter(ft)
+	defer r.close()
+
+	<-r.ready
+
+	go func() {
+		<-ft.sendC
+		ft.lines <- "%begin 1712000001 1 0"
+		ft.lines <- "result"
+		ft.lines <- "%end 1712000001 1 0"
+	}()
+
+	result, err := r.runCommand("display-message")
+	if err != nil {
+		t.Fatalf("runCommand returned error: %v", err)
+	}
+	if len(result.Lines) != 1 || result.Lines[0] != "result" {
+		t.Fatalf("unexpected result lines: %#v", result.Lines)
+	}
+}
+
+func TestRouterInitialCommandWithEvents(t *testing.T) {
+	ft := newFakeTransport()
+	// tmux often sends notification events before the initial %begin.
+	ft.lines <- "%sessions-changed"
+	ft.lines <- "%session-changed $0 main"
+	ft.lines <- "%begin 1712000000 0 0"
+	ft.lines <- "%end 1712000000 0 0"
+
+	r := newRouter(ft)
+	defer r.close()
+
+	<-r.ready
+
+	go func() {
+		<-ft.sendC
+		ft.lines <- "%begin 1712000001 1 0"
+		ft.lines <- "ok"
+		ft.lines <- "%end 1712000001 1 0"
+	}()
+
+	result, err := r.runCommand("list-sessions")
+	if err != nil {
+		t.Fatalf("runCommand returned error: %v", err)
+	}
+	if len(result.Lines) != 1 || result.Lines[0] != "ok" {
+		t.Fatalf("unexpected result lines: %#v", result.Lines)
 	}
 }

@@ -64,7 +64,7 @@ func (r *recordTransport) respond(lines ...string) {
 func TestSetOptionCommand(t *testing.T) {
 	rt := newRecordTransport()
 	tmux := &Tmux{transport: rt}
-	tmux.router = newRouter(rt)
+	tmux.router = newRouterWithInit(rt, false)
 	defer tmux.Close()
 
 	go func() {
@@ -89,7 +89,7 @@ func TestSetOptionCommand(t *testing.T) {
 func TestDeleteOptionCommand(t *testing.T) {
 	rt := newRecordTransport()
 	tmux := &Tmux{transport: rt}
-	tmux.router = newRouter(rt)
+	tmux.router = newRouterWithInit(rt, false)
 	defer tmux.Close()
 
 	go func() {
@@ -116,7 +116,7 @@ func TestDeleteOptionCommand(t *testing.T) {
 func TestDeleteOptionErrorPropagation(t *testing.T) {
 	rt := newRecordTransport()
 	tmux := &Tmux{transport: rt}
-	tmux.router = newRouter(rt)
+	tmux.router = newRouterWithInit(rt, false)
 	defer tmux.Close()
 
 	go func() {
@@ -134,7 +134,7 @@ func TestDeleteOptionErrorPropagation(t *testing.T) {
 func TestOptionRetrieval(t *testing.T) {
 	rt := newRecordTransport()
 	tmux := &Tmux{transport: rt}
-	tmux.router = newRouter(rt)
+	tmux.router = newRouterWithInit(rt, false)
 	defer tmux.Close()
 
 	go func() {
@@ -157,7 +157,7 @@ func TestOptionRetrieval(t *testing.T) {
 func TestOptionErrorPropagation(t *testing.T) {
 	rt := newRecordTransport()
 	tmux := &Tmux{transport: rt}
-	tmux.router = newRouter(rt)
+	tmux.router = newRouterWithInit(rt, false)
 	defer tmux.Close()
 
 	go func() {
@@ -174,7 +174,7 @@ func TestOptionErrorPropagation(t *testing.T) {
 func TestOptionsRetrieval(t *testing.T) {
 	rt := newRecordTransport()
 	tmux := &Tmux{transport: rt}
-	tmux.router = newRouter(rt)
+	tmux.router = newRouterWithInit(rt, false)
 	defer tmux.Close()
 
 	go func() {
@@ -204,7 +204,7 @@ func TestOptionsRetrieval(t *testing.T) {
 func TestCommandMultiLineOutput(t *testing.T) {
 	rt := newRecordTransport()
 	tmux := &Tmux{transport: rt}
-	tmux.router = newRouter(rt)
+	tmux.router = newRouterWithInit(rt, false)
 	defer tmux.Close()
 
 	go func() {
@@ -225,7 +225,7 @@ func TestCommandMultiLineOutput(t *testing.T) {
 func TestCommandErrorPropagation(t *testing.T) {
 	rt := newRecordTransport()
 	tmux := &Tmux{transport: rt}
-	tmux.router = newRouter(rt)
+	tmux.router = newRouterWithInit(rt, false)
 	defer tmux.Close()
 
 	go func() {

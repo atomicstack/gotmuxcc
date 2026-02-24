@@ -12,7 +12,7 @@ func newTestWindow(ft *fakeTransport, r *router) *Window {
 
 func TestWindowUnlink(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	win := newTestWindow(ft, r)
@@ -34,7 +34,7 @@ func TestWindowUnlink(t *testing.T) {
 
 func TestWindowLink(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	win := newTestWindow(ft, r)
@@ -56,7 +56,7 @@ func TestWindowLink(t *testing.T) {
 
 func TestWindowMoveToSession(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	win := newTestWindow(ft, r)
@@ -78,7 +78,7 @@ func TestWindowMoveToSession(t *testing.T) {
 
 func TestWindowSwap(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	win := newTestWindow(ft, r)
@@ -100,7 +100,7 @@ func TestWindowSwap(t *testing.T) {
 
 func TestTmuxUnlinkWindow(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -122,7 +122,7 @@ func TestTmuxUnlinkWindow(t *testing.T) {
 
 func TestTmuxLinkWindow(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -144,7 +144,7 @@ func TestTmuxLinkWindow(t *testing.T) {
 
 func TestTmuxMoveWindowToSession(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -166,7 +166,7 @@ func TestTmuxMoveWindowToSession(t *testing.T) {
 
 func TestTmuxSwapWindows(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -188,7 +188,7 @@ func TestTmuxSwapWindows(t *testing.T) {
 
 func TestTmuxSelectWindow(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -210,7 +210,7 @@ func TestTmuxSelectWindow(t *testing.T) {
 
 func TestTmuxSelectPane(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -232,7 +232,7 @@ func TestTmuxSelectPane(t *testing.T) {
 
 func TestTmuxSelectLayout(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}

@@ -5,7 +5,7 @@ import "testing"
 func TestQueryRunSuccess(t *testing.T) {
 	tr := newRecordTransport()
 	tmux := &Tmux{transport: tr}
-	tmux.router = newRouter(tr)
+	tmux.router = newRouterWithInit(tr, false)
 	defer tmux.Close()
 
 	go func() {
@@ -37,7 +37,7 @@ func TestQueryRunSuccess(t *testing.T) {
 func TestQueryRunError(t *testing.T) {
 	tr := newRecordTransport()
 	tmux := &Tmux{transport: tr}
-	tmux.router = newRouter(tr)
+	tmux.router = newRouterWithInit(tr, false)
 	defer tmux.Close()
 
 	go func() {

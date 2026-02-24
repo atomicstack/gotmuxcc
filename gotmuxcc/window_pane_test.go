@@ -93,7 +93,7 @@ func formatRecord(vars []string, overrides map[string]string) string {
 func TestWindowCommands(t *testing.T) {
 	tr := newAutoTransport()
 	tmux := &Tmux{transport: tr}
-	tmux.router = newRouter(tr)
+	tmux.router = newRouterWithInit(tr, false)
 	defer tmux.Close()
 
 	if _, err := tmux.ListAllWindows(); err != nil {
@@ -136,7 +136,7 @@ func TestWindowCommands(t *testing.T) {
 func TestPaneCommands(t *testing.T) {
 	tr := newAutoTransport()
 	tmux := &Tmux{transport: tr}
-	tmux.router = newRouter(tr)
+	tmux.router = newRouterWithInit(tr, false)
 	defer tmux.Close()
 
 	if _, err := tmux.ListAllPanes(); err != nil {
@@ -218,7 +218,7 @@ func TestListAllWindowsFallback(t *testing.T) {
 
 	tr := newScriptedTransport(responses)
 	tmux := &Tmux{transport: tr}
-	tmux.router = newRouter(tr)
+	tmux.router = newRouterWithInit(tr, false)
 	defer tmux.Close()
 
 	windows, err := tmux.ListAllWindows()
@@ -299,7 +299,7 @@ func TestListAllPanesFallback(t *testing.T) {
 
 	tr := newScriptedTransport(responses)
 	tmux := &Tmux{transport: tr}
-	tmux.router = newRouter(tr)
+	tmux.router = newRouterWithInit(tr, false)
 	defer tmux.Close()
 
 	panes, err := tmux.ListAllPanes()

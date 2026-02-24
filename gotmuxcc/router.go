@@ -96,6 +96,16 @@ type router struct {
 	stack    []string
 	err      error
 
+	// initialCmd tracks the implicit %begin/%end pair that tmux emits
+	// when a control-mode session starts (from attach-session or
+	// new-session passed on the command line). The ready channel is
+	// closed once the initial pair has been consumed so that callers
+	// can wait for the router to settle before sending commands.
+	initialCmd  bool
+	initialDone bool
+	ready       chan struct{}
+	readyOnce   sync.Once
+
 	events       chan Event
 	eventsOnce   sync.Once
 	closed       chan struct{}
@@ -103,12 +113,22 @@ type router struct {
 }
 
 func newRouter(t controlTransport) *router {
-	trace.Printf("router", "new router created transport=%T", t)
+	return newRouterWithInit(t, true)
+}
+
+func newRouterWithInit(t controlTransport, expectInitial bool) *router {
+	trace.Printf("router", "new router created transport=%T expectInitial=%v", t, expectInitial)
 	r := &router{
-		transport: t,
-		inflight:  make(map[string]*commandState),
-		events:    make(chan Event, 64),
-		closed:    make(chan struct{}),
+		transport:  t,
+		inflight:   make(map[string]*commandState),
+		events:     make(chan Event, 64),
+		closed:     make(chan struct{}),
+		ready:      make(chan struct{}),
+		initialCmd: expectInitial,
+	}
+
+	if !expectInitial {
+		r.readyOnce.Do(func() { close(r.ready) })
 	}
 
 	go r.readLoop()
@@ -196,6 +216,19 @@ func (r *router) handleBegin(line string) {
 	}
 
 	if len(r.pending) == 0 {
+		// If we're still waiting for the initial command response,
+		// track it so its output and %end are consumed cleanly.
+		if r.initialCmd && !r.initialDone {
+			trace.Printf("router", "begin <- #%s (initial command)", number)
+			r.inflight[number] = &commandState{
+				request: newCommandRequest("(initial)"),
+				time:    timeStr,
+				number:  number,
+				flags:   flags,
+			}
+			r.stack = append(r.stack, number)
+			return
+		}
 		r.emitEventLocked(eventForError("unexpected-begin", line, errUnexpectedBegin))
 		return
 	}
@@ -304,6 +337,7 @@ func (r *router) appendOutput(line string) {
 
 func (r *router) finishCommand(number, timeStr, flags string, cmdErr error, detail string) {
 	var state *commandState
+	var isInitial bool
 
 	r.mu.Lock()
 	if r.err != nil {
@@ -315,10 +349,20 @@ func (r *router) finishCommand(number, timeStr, flags string, cmdErr error, deta
 	if state != nil {
 		delete(r.inflight, number)
 		r.removeFromStack(number)
+		if state.request.command == "(initial)" {
+			isInitial = true
+			r.initialDone = true
+		}
 	}
 	pendingCount := len(r.pending)
 	inflightCount := len(r.inflight)
 	r.mu.Unlock()
+
+	if isInitial {
+		trace.Printf("router", "initial command settled #%s", number)
+		r.readyOnce.Do(func() { close(r.ready) })
+		return
+	}
 
 	if state == nil {
 		if cmdErr != nil {
@@ -448,6 +492,7 @@ func (r *router) failAll(err error) {
 		state.request.fail(err)
 	}
 
+	r.readyOnce.Do(func() { close(r.ready) })
 	r.eventsOnce.Do(func() {
 		close(r.events)
 		close(r.closed)

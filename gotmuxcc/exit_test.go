@@ -8,7 +8,7 @@ import (
 
 func TestHandleExitEmitsEvent(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	ft.lines <- "%exit server exiting"
@@ -28,7 +28,7 @@ func TestHandleExitEmitsEvent(t *testing.T) {
 
 func TestHandleExitNoReason(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	ft.lines <- "%exit"
@@ -48,7 +48,7 @@ func TestHandleExitNoReason(t *testing.T) {
 
 func TestHandleExitFailsPendingCommands(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	go func() {
@@ -75,7 +75,7 @@ func TestHandleExitFailsPendingCommands(t *testing.T) {
 
 func TestHandleExitFailsInflightCommands(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	go func() {

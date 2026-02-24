@@ -7,7 +7,7 @@ import (
 
 func TestDisplayMessage(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -36,7 +36,7 @@ func TestDisplayMessage(t *testing.T) {
 
 func TestDisplayMessageWithTarget(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -62,7 +62,7 @@ func TestDisplayMessageWithTarget(t *testing.T) {
 
 func TestListSessionsFormat(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -89,7 +89,7 @@ func TestListSessionsFormat(t *testing.T) {
 
 func TestListSessionsFormatQuotesWhitespace(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -112,7 +112,7 @@ func TestListSessionsFormatQuotesWhitespace(t *testing.T) {
 
 func TestDisplayMessageQuotesFormat(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -136,7 +136,7 @@ func TestDisplayMessageQuotesFormat(t *testing.T) {
 
 func TestListWindowsFormatQuotesFilter(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -159,7 +159,7 @@ func TestListWindowsFormatQuotesFilter(t *testing.T) {
 
 func TestListWindowsFormatAll(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -185,7 +185,7 @@ func TestListWindowsFormatAll(t *testing.T) {
 
 func TestListWindowsFormatWithTarget(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -214,7 +214,7 @@ func TestListWindowsFormatWithTarget(t *testing.T) {
 
 func TestListWindowsFormatWithFilter(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -236,7 +236,7 @@ func TestListWindowsFormatWithFilter(t *testing.T) {
 
 func TestListPanesFormatAll(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}

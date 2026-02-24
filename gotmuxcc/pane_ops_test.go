@@ -12,7 +12,7 @@ func newTestPane(ft *fakeTransport, r *router) *Pane {
 
 func TestPaneRename(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	pane := newTestPane(ft, r)
@@ -34,7 +34,7 @@ func TestPaneRename(t *testing.T) {
 
 func TestPaneSwap(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	pane := newTestPane(ft, r)
@@ -56,7 +56,7 @@ func TestPaneSwap(t *testing.T) {
 
 func TestPaneMove(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	pane := newTestPane(ft, r)
@@ -78,7 +78,7 @@ func TestPaneMove(t *testing.T) {
 
 func TestPaneMoveNoTarget(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	pane := newTestPane(ft, r)
@@ -100,7 +100,7 @@ func TestPaneMoveNoTarget(t *testing.T) {
 
 func TestPaneBreak(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	pane := newTestPane(ft, r)
@@ -122,7 +122,7 @@ func TestPaneBreak(t *testing.T) {
 
 func TestPaneJoin(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	pane := newTestPane(ft, r)
@@ -144,7 +144,7 @@ func TestPaneJoin(t *testing.T) {
 
 func TestPaneResize(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	pane := newTestPane(ft, r)
@@ -166,7 +166,7 @@ func TestPaneResize(t *testing.T) {
 
 func TestCaptureOptionsStartEndLine(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -193,7 +193,7 @@ func TestCaptureOptionsStartEndLine(t *testing.T) {
 
 func TestTmuxRenamePane(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -215,7 +215,7 @@ func TestTmuxRenamePane(t *testing.T) {
 
 func TestTmuxSwapPanes(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -237,7 +237,7 @@ func TestTmuxSwapPanes(t *testing.T) {
 
 func TestTmuxResizePane(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}

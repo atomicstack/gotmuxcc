@@ -7,7 +7,7 @@ import (
 
 func TestSetClientSize(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -30,7 +30,7 @@ func TestSetClientSize(t *testing.T) {
 
 func TestSetWindowSize(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -53,7 +53,7 @@ func TestSetWindowSize(t *testing.T) {
 
 func TestClearWindowSize(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -78,7 +78,7 @@ func TestClearWindowSize(t *testing.T) {
 
 func TestSetControlFlags(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -103,7 +103,7 @@ func TestSetControlFlags(t *testing.T) {
 
 func TestEnablePauseAfter(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -125,7 +125,7 @@ func TestEnablePauseAfter(t *testing.T) {
 
 func TestDisablePauseAfter(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -147,7 +147,7 @@ func TestDisablePauseAfter(t *testing.T) {
 
 func TestSetPaneOutput(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -170,7 +170,7 @@ func TestSetPaneOutput(t *testing.T) {
 
 func TestEnablePaneOutput(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -192,7 +192,7 @@ func TestEnablePaneOutput(t *testing.T) {
 
 func TestDisablePaneOutput(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -214,7 +214,7 @@ func TestDisablePaneOutput(t *testing.T) {
 
 func TestPausePaneOutput(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -236,7 +236,7 @@ func TestPausePaneOutput(t *testing.T) {
 
 func TestContinuePaneOutput(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -258,7 +258,7 @@ func TestContinuePaneOutput(t *testing.T) {
 
 func TestSetMultiplePaneOutputs(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -280,7 +280,7 @@ func TestSetMultiplePaneOutputs(t *testing.T) {
 
 func TestSetMultiplePaneOutputsEmpty(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -296,7 +296,7 @@ func TestSetMultiplePaneOutputsEmpty(t *testing.T) {
 
 func TestReportPaneColors(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -322,7 +322,7 @@ func TestReportPaneColors(t *testing.T) {
 
 func TestReportPaneColorsSimple(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}

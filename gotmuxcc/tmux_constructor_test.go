@@ -6,9 +6,17 @@ import (
 	"testing"
 )
 
+// seedInitialHandshake pre-fills the transport's lines channel with the
+// initial %begin/%end pair that tmux sends when starting control mode.
+func seedInitialHandshake(rt *recordTransport) {
+	rt.lines <- "%begin 0 0 0"
+	rt.lines <- "%end 0 0 0"
+}
+
 func TestNewTmuxWithOptionsUsesDialer(t *testing.T) {
 	called := false
 	fakeTransport := newRecordTransport()
+	seedInitialHandshake(fakeTransport)
 	dialer := DialerFunc(func(ctx context.Context, socketPath string) (controlTransport, error) {
 		called = true
 		return fakeTransport, nil
@@ -39,9 +47,11 @@ func TestNewTmuxWithOptionsDialerError(t *testing.T) {
 
 func TestWithContextOption(t *testing.T) {
 	var gotCtx context.Context
+	fakeTransport := newRecordTransport()
+	seedInitialHandshake(fakeTransport)
 	dialer := DialerFunc(func(ctx context.Context, socketPath string) (controlTransport, error) {
 		gotCtx = ctx
-		return newRecordTransport(), nil
+		return fakeTransport, nil
 	})
 
 	ctx := context.WithValue(context.Background(), struct{}{}, "value")

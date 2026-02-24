@@ -7,7 +7,7 @@ import (
 
 func TestSubscribeBuildCommand(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -34,7 +34,7 @@ func TestSubscribeBuildCommand(t *testing.T) {
 
 func TestSubscribeSessionTarget(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -57,7 +57,7 @@ func TestSubscribeSessionTarget(t *testing.T) {
 
 func TestSubscribeAllPanes(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -79,7 +79,7 @@ func TestSubscribeAllPanes(t *testing.T) {
 
 func TestUnsubscribe(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}
@@ -103,7 +103,7 @@ func TestUnsubscribe(t *testing.T) {
 
 func TestSubscribePaneTarget(t *testing.T) {
 	ft := newFakeTransport()
-	r := newRouter(ft)
+	r := newRouterWithInit(ft, false)
 	defer r.close()
 
 	tmux := &Tmux{transport: ft, router: r}

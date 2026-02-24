@@ -45,7 +45,7 @@ func (s *simpleTransport) Close() error {
 func TestSessionListAndGet(t *testing.T) {
 	tr := newSimpleTransport()
 	tmux := &Tmux{transport: tr}
-	tmux.router = newRouter(tr)
+	tmux.router = newRouterWithInit(tr, false)
 	defer tmux.Close()
 
 	go func() {
@@ -72,7 +72,7 @@ func TestSessionListAndGet(t *testing.T) {
 func TestSessionLifecycleCommands(t *testing.T) {
 	tr := newSimpleTransport()
 	tmux := &Tmux{transport: tr}
-	tmux.router = newRouter(tr)
+	tmux.router = newRouterWithInit(tr, false)
 	defer tmux.Close()
 
 	go func() {
@@ -111,7 +111,7 @@ func TestSessionLifecycleCommands(t *testing.T) {
 func TestSessionAttachDetachHelpers(t *testing.T) {
 	tr := newSimpleTransport()
 	tmux := &Tmux{transport: tr}
-	tmux.router = newRouter(tr)
+	tmux.router = newRouterWithInit(tr, false)
 	defer tmux.Close()
 
 	session := &Session{Name: "sess", tmux: tmux}
