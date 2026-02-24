@@ -18,7 +18,8 @@ issuing many tmux operations from Go.
   stdin/stdout pipes.
 - **Concurrency-safe router** — commands are dispatched, correlated with
   `%begin/%end/%error` frames, and returned to callers without external
-  locking.
+  locking. The router automatically absorbs the initial control-mode
+  handshake so the first user command is never mismatched.
 - **24 typed notification structs** — every tmux control-mode notification
   (`%output`, `%layout-change`, `%session-changed`, etc.) is parsed into a
   concrete Go type via `Event.Notification()`.

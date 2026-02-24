@@ -133,3 +133,14 @@ Here’s what’s happened so far:
   ContinuePaneOutput(), SetMultiplePaneOutputs() for batch operations.
 - Implemented pane color reports (refresh-client -r): ReportPaneColors() relays
   terminal color query responses (OSC 10/11) back to tmux for specific panes.
+- tmux-popup-control now uses gotmuxcc as intended: a single long-lived control-mode connection shared across all 28 call sites, rather than spawning a new `tmux -C` subprocess per operation. This validates the persistent-connection design and exercises the library under sustained reuse.
+- Added initial control-mode handshake handling in the router: tmux emits an
+  implicit `%begin/%end` pair when a control-mode session starts (from
+  `attach-session` or `new-session`). The router now absorbs this pair via
+  `initialCmd` tracking and a `ready` channel, preventing the startup frames
+  from being mismatched with the first user command. `NewTmuxWithOptions`
+  blocks until the handshake completes so callers get a fully-settled router.
+  Added `newRouterWithInit()` constructor for tests to opt out of waiting, a
+  `seedInitialHandshake()` helper for constructor tests, and three new router
+  tests covering absorbed initial pairs, initial output, and pre-handshake
+  notification events.
