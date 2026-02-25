@@ -2,6 +2,7 @@ package gotmuxcc
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 )
@@ -340,5 +341,156 @@ func TestRouterInitialCommandWithEvents(t *testing.T) {
 	}
 	if len(result.Lines) != 1 || result.Lines[0] != "ok" {
 		t.Fatalf("unexpected result lines: %#v", result.Lines)
+	}
+}
+
+func TestRouterEnqueueOrderMatchesSendOrder(t *testing.T) {
+	// orderedFakeTransport records send order via a channel so we can
+	// verify that enqueue serialises append+send atomically.
+	ft := &orderedFakeTransport{
+		sendOrder: make(chan string, 64),
+		lines:     make(chan string, 128),
+		done:      make(chan error, 1),
+	}
+
+	r := newRouterWithInit(ft, false)
+	defer r.close()
+
+	const N = 20
+	var wg sync.WaitGroup
+	wg.Add(N)
+
+	// Launch N goroutines that each send a unique command concurrently.
+	for i := 0; i < N; i++ {
+		go func(idx int) {
+			defer wg.Done()
+			_, _ = r.runCommand(fmt.Sprintf("cmd-%d", idx))
+		}(i)
+	}
+
+	// Collect the order commands arrived at the transport.
+	sent := make([]string, 0, N)
+	for i := 0; i < N; i++ {
+		sent = append(sent, <-ft.sendOrder)
+	}
+
+	// Verify that the pending queue (which determines response matching)
+	// has the same order as the commands were sent to the transport.
+	r.mu.Lock()
+	pendingCmds := make([]string, len(r.pending))
+	for i, req := range r.pending {
+		pendingCmds[i] = req.command
+	}
+	r.mu.Unlock()
+
+	if len(pendingCmds) != len(sent) {
+		t.Fatalf("pending=%d sent=%d", len(pendingCmds), len(sent))
+	}
+	for i := range sent {
+		if sent[i] != pendingCmds[i] {
+			t.Fatalf("order mismatch at %d: sent=%q pending=%q", i, sent[i], pendingCmds[i])
+		}
+	}
+
+	// Complete all commands so goroutines can exit.
+	for i, cmd := range sent {
+		num := fmt.Sprintf("%d", i+1)
+		ft.lines <- fmt.Sprintf("%%begin 1 %s 0", num)
+		ft.lines <- cmd
+		ft.lines <- fmt.Sprintf("%%end 1 %s 0", num)
+	}
+	wg.Wait()
+}
+
+type orderedFakeTransport struct {
+	sendMu    sync.Mutex
+	sendOrder chan string
+
+	lines     chan string
+	done      chan error
+	closeOnce sync.Once
+}
+
+func (f *orderedFakeTransport) Send(cmd string) error {
+	f.sendMu.Lock()
+	f.sendOrder <- cmd
+	f.sendMu.Unlock()
+	return nil
+}
+
+func (f *orderedFakeTransport) Lines() <-chan string { return f.lines }
+func (f *orderedFakeTransport) Done() <-chan error   { return f.done }
+func (f *orderedFakeTransport) Close() error {
+	f.closeOnce.Do(func() {
+		close(f.lines)
+		select {
+		case f.done <- errors.New("closed"):
+		default:
+		}
+		close(f.done)
+	})
+	return nil
+}
+
+func TestRouterPercentLinesAsOutputInsideCommand(t *testing.T) {
+	ft := newFakeTransport()
+	r := newRouterWithInit(ft, false)
+	defer r.close()
+
+	// Simulate capture-pane -p output that contains lines starting with %.
+	// These should be treated as command output, not events.
+	go func() {
+		<-ft.sendC
+		ft.lines <- "%begin 1 1 0"
+		ft.lines <- "$ echo hello"
+		ft.lines <- "hello"
+		ft.lines <- "%prompt > "
+		ft.lines <- "%sessions-changed"
+		ft.lines <- ""
+		ft.lines <- "trailing"
+		ft.lines <- "%end 1 1 0"
+	}()
+
+	result, err := r.runCommand("capture-pane -p -t %1")
+	if err != nil {
+		t.Fatalf("runCommand returned error: %v", err)
+	}
+
+	expected := []string{
+		"$ echo hello",
+		"hello",
+		"%prompt > ",
+		"%sessions-changed",
+		"",
+		"trailing",
+	}
+	if len(result.Lines) != len(expected) {
+		t.Fatalf("expected %d lines, got %d: %#v", len(expected), len(result.Lines), result.Lines)
+	}
+	for i, want := range expected {
+		if result.Lines[i] != want {
+			t.Fatalf("line %d: want %q, got %q", i, want, result.Lines[i])
+		}
+	}
+
+	// Verify no spurious events were emitted.
+	select {
+	case evt := <-r.eventsChannel():
+		t.Fatalf("unexpected event: %#v", evt)
+	default:
+	}
+}
+
+func TestRouterPercentLinesAsEventsOutsideCommand(t *testing.T) {
+	ft := newFakeTransport()
+	r := newRouterWithInit(ft, false)
+	defer r.close()
+
+	// When no command is inflight, %-prefixed lines should still be events.
+	ft.lines <- "%window-add @1"
+
+	evt := <-r.eventsChannel()
+	if evt.Name != "window-add" {
+		t.Fatalf("expected window-add event, got %#v", evt)
 	}
 }

@@ -195,7 +195,19 @@ func (r *router) handleLine(line string) {
 	case strings.HasPrefix(line, "%exit"):
 		r.handleExit(line)
 	case strings.HasPrefix(line, "%"):
-		r.emitEvent(parseEvent(line))
+		// When inside a command response (stack non-empty), treat
+		// %-prefixed lines as command output rather than events.
+		// tmux does not escape command output (e.g. capture-pane -p),
+		// so pane content containing lines starting with % would
+		// otherwise be silently consumed as notifications.
+		r.mu.Lock()
+		inflight := len(r.stack) > 0
+		r.mu.Unlock()
+		if inflight {
+			r.appendOutput(line)
+		} else {
+			r.emitEvent(parseEvent(line))
+		}
 	default:
 		r.appendOutput(line)
 	}
@@ -509,10 +521,12 @@ func (r *router) enqueue(req *commandRequest) error {
 	}
 	r.pending = append(r.pending, req)
 	trace.Printf("router", "queued -> %s (pending=%d)", trace.FormatControlCommand(req.command), len(r.pending))
-	r.mu.Unlock()
 
+	// Send while still holding the mutex so that the pending queue order
+	// matches the order commands are written to the transport. Releasing
+	// the lock before Send would allow a concurrent enqueue to append and
+	// send its command first, causing response mismatch in handleBegin.
 	if err := r.transport.Send(req.command); err != nil {
-		r.mu.Lock()
 		for idx, pending := range r.pending {
 			if pending == req {
 				r.pending = append(r.pending[:idx], r.pending[idx+1:]...)
@@ -523,6 +537,7 @@ func (r *router) enqueue(req *commandRequest) error {
 		r.mu.Unlock()
 		return err
 	}
+	r.mu.Unlock()
 
 	return nil
 }
