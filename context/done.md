@@ -168,3 +168,10 @@ Here’s what’s happened so far:
   spaces or special characters are properly shell-quoted. Removed redundant
   `quoteArgument()` calls from `display.go` callers that were manually
   quoting before passing to `fargs`.
+- Fixed `quoteArgument()` to also quote strings containing tmux parser special
+  characters (`#`, `;`, `{`, `}`, `~`). In tmux's command parser (cmd-parse.y),
+  unquoted `#` triggers comment handling — everything from `#` to end-of-line
+  is ignored. This caused `display-message -p #{client_name}` to lose its
+  format argument, falling back to `DISPLAY_MESSAGE_TEMPLATE` (the default
+  status line format). Now format variables like `#{client_name}` are properly
+  single-quoted when passed as fargs values.
