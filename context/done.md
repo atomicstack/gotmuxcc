@@ -144,3 +144,15 @@ Here’s what’s happened so far:
   `seedInitialHandshake()` helper for constructor tests, and three new router
   tests covering absorbed initial pairs, initial output, and pre-handshake
   notification events.
+- Fixed router.enqueue() concurrency bug: moved transport.Send() inside the
+  mutex so the pending queue append and send are atomic, preventing response
+  mismatch when multiple goroutines call runCommand() concurrently. Added
+  TestRouterEnqueueOrderMatchesSendOrder to verify ordering under contention.
+- Fixed CapturePane returning empty output in control mode: modified
+  router.handleLine() so that when inside a command response (stack non-empty),
+  lines starting with % that don't match frame markers (%begin, %end, %error,
+  %exit) are treated as command output via appendOutput() instead of being
+  consumed as events. tmux's capture-pane -p sends raw pane content between
+  %begin/%end without escaping %-prefixed lines. Added unit tests verifying
+  %-prefixed lines are captured as output inside commands and still emitted as
+  events outside commands.
