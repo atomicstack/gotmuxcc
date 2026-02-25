@@ -156,3 +156,15 @@ Here’s what’s happened so far:
   %begin/%end without escaping %-prefixed lines. Added unit tests verifying
   %-prefixed lines are captured as output inside commands and still emitted as
   events outside commands.
+- Fixed `%error` frame handler to extract error text from accumulated output
+  lines (between `%begin` and `%error`) instead of looking for text in the
+  `%error` frame itself. tmux's `cmdq_guard` emits `%error <time> <number>
+  <flags>` with no trailing text; error messages are written as output via
+  `cmdq_error` → `cmdq_print` before the `%error` guard. Previously all
+  errors were reported as "tmux reported an error" when `rest` was empty.
+  Updated all test fixtures to match the real tmux frame format.
+- Fixed `fargs` values not being quoted in query command strings. Applied
+  `quoteArgument()` to all flagArgs in `query.build()` so values containing
+  spaces or special characters are properly shell-quoted. Removed redundant
+  `quoteArgument()` calls from `display.go` callers that were manually
+  quoting before passing to `fargs`.
