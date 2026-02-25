@@ -238,3 +238,27 @@ func TestCommandErrorPropagation(t *testing.T) {
 		t.Fatalf("expected wrapped command error, got %v", err)
 	}
 }
+
+func TestQuoteArgument(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"", "''"},
+		{"simple", "simple"},
+		{"-t", "-t"},
+		{"value with spaces", "'value with spaces'"},
+		{"#{client_name}", "'#{client_name}'"},
+		{"#comment", "'#comment'"},
+		{"a;b", "'a;b'"},
+		{"{grouped}", "'{grouped}'"},
+		{"has'quote", "'has'\\''quote'"},
+		{"~/path", "'~/path'"},
+	}
+	for _, tt := range tests {
+		got := quoteArgument(tt.input)
+		if got != tt.want {
+			t.Errorf("quoteArgument(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}

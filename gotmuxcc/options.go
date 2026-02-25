@@ -120,7 +120,7 @@ func quoteArgument(arg string) string {
 	if arg == "" {
 		return "''"
 	}
-	if strings.ContainsAny(arg, " \t\n'\"\\") {
+	if strings.ContainsAny(arg, " \t\n'\"\\#;{}~") {
 		escaped := strings.ReplaceAll(arg, "'", "'\\''")
 		return "'" + escaped + "'"
 	}
