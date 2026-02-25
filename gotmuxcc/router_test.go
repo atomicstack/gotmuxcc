@@ -86,8 +86,8 @@ func TestRouterRunCommandError(t *testing.T) {
 	go func() {
 		<-ft.sendC
 		ft.lines <- "%begin 1712000000 2 0"
-		ft.lines <- "partial output"
-		ft.lines <- "%error 1712000000 2 0 failed"
+		ft.lines <- "no such session: foo"
+		ft.lines <- "%error 1712000000 2 0"
 	}()
 
 	_, err := r.runCommand("list-panes")
@@ -98,7 +98,7 @@ func TestRouterRunCommandError(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *commandError, got %T", err)
 	}
-	if cmdErr.Message != "failed" {
+	if cmdErr.Message != "no such session: foo" {
 		t.Fatalf("unexpected error message: %q", cmdErr.Message)
 	}
 }

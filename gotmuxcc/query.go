@@ -55,7 +55,9 @@ func (q *query) build() (string, error) {
 
 	parts := make([]string, 0, len(q.command)+len(q.flagArgs)+len(q.posArgs)+4)
 	parts = append(parts, q.command...)
-	parts = append(parts, q.flagArgs...)
+	for _, fa := range q.flagArgs {
+		parts = append(parts, quoteArgument(fa))
+	}
 
 	if len(q.variables) > 0 {
 		formats := make([]string, len(q.variables))

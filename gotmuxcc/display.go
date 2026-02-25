@@ -15,7 +15,7 @@ func (t *Tmux) DisplayMessage(target, format string) (string, error) {
 	if target != "" {
 		q.fargs("-t", target)
 	}
-	q.fargs("-p", quoteArgument(format))
+	q.fargs("-p", format)
 
 	result, err := q.run()
 	if err != nil {
@@ -30,7 +30,7 @@ func (t *Tmux) DisplayMessage(target, format string) (string, error) {
 func (t *Tmux) ListSessionsFormat(format string) ([]string, error) {
 	q := t.query().
 		cmd("list-sessions").
-		fargs("-F", quoteArgument(format))
+		fargs("-F", format)
 	result, err := q.run()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list sessions: %w", err)
@@ -52,9 +52,9 @@ func (t *Tmux) ListWindowsFormat(target, filter, format string) ([]string, error
 		q.fargs("-a")
 	}
 	if filter != "" {
-		q.fargs("-f", quoteArgument(filter))
+		q.fargs("-f", filter)
 	}
-	q.fargs("-F", quoteArgument(format))
+	q.fargs("-F", format)
 
 	result, err := q.run()
 	if err != nil {
@@ -77,9 +77,9 @@ func (t *Tmux) ListPanesFormat(target, filter, format string) ([]string, error) 
 		q.fargs("-a")
 	}
 	if filter != "" {
-		q.fargs("-f", quoteArgument(filter))
+		q.fargs("-f", filter)
 	}
-	q.fargs("-F", quoteArgument(format))
+	q.fargs("-F", format)
 
 	result, err := q.run()
 	if err != nil {

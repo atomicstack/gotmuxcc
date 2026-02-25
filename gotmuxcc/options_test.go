@@ -122,7 +122,7 @@ func TestDeleteOptionErrorPropagation(t *testing.T) {
 	go func() {
 		for cmd := range rt.sendC {
 			_ = cmd
-			rt.respond("%begin 1 1 0", "%error 1 1 0 failure")
+			rt.respond("%begin 1 1 0", "failure", "%error 1 1 0")
 		}
 	}()
 
@@ -162,7 +162,7 @@ func TestOptionErrorPropagation(t *testing.T) {
 
 	go func() {
 		for range rt.sendC {
-			rt.respond("%begin 1 1 0", "%error 1 1 0 missing")
+			rt.respond("%begin 1 1 0", "missing", "%error 1 1 0")
 		}
 	}()
 
@@ -230,7 +230,7 @@ func TestCommandErrorPropagation(t *testing.T) {
 
 	go func() {
 		for range rt.sendC {
-			rt.respond("%begin 1 1 0", "%error 1 1 0 bad")
+			rt.respond("%begin 1 1 0", "bad", "%error 1 1 0")
 		}
 	}()
 

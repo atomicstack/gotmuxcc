@@ -42,7 +42,7 @@ func TestQueryRunError(t *testing.T) {
 
 	go func() {
 		<-tr.sendC
-		tr.respond("%begin 1 1 0", "%error 1 1 0 failure")
+		tr.respond("%begin 1 1 0", "failure", "%error 1 1 0")
 	}()
 
 	q := newQuery(tmux).cmd("list-panes")

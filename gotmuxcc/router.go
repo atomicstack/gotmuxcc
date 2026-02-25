@@ -269,15 +269,26 @@ func (r *router) handleEnd(line string) {
 }
 
 func (r *router) handleError(line string) {
-	timeStr, number, flags, rest, err := parseFrame(line, "%error")
+	timeStr, number, flags, _, err := parseFrame(line, "%error")
 	if err != nil {
 		r.emitEvent(eventForError("malformed-error", line, err))
 		return
 	}
-	if rest == "" {
-		rest = "tmux reported an error"
+
+	// tmux writes error text as output lines between %begin and %error
+	// (via cmdq_error → cmdq_print), not in the %error frame itself.
+	// Extract the accumulated output as the error message.
+	r.mu.Lock()
+	msg := ""
+	if state := r.inflight[number]; state != nil && len(state.output) > 0 {
+		msg = strings.Join(state.output, "\n")
 	}
-	r.finishCommand(number, timeStr, flags, errors.New(rest), rest)
+	r.mu.Unlock()
+
+	if msg == "" {
+		msg = "tmux reported an error"
+	}
+	r.finishCommand(number, timeStr, flags, errors.New(msg), msg)
 }
 
 func (r *router) handleExit(line string) {
