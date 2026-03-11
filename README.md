@@ -125,5 +125,4 @@ See `docs/testing.md` for details on running tests inside restricted sandboxes.
 
 ## License
 
-This project inherits the MIT-style licensing approach from gotmux; the final
-text will be provided alongside the first public release.
+MIT License. See [LICENSE](LICENSE) for details.
