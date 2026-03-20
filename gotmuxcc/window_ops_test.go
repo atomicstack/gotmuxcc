@@ -327,3 +327,31 @@ func TestTmuxSelectLayout(t *testing.T) {
 		t.Fatalf("SelectLayout returned error: %v", err)
 	}
 }
+
+func TestTmuxSelectLayoutByTarget(t *testing.T) {
+	ft := newFakeTransport()
+	r := newRouterWithInit(ft, false)
+	defer r.close()
+
+	tmux := &Tmux{transport: ft, router: r}
+
+	go func() {
+		cmd := <-ft.sendC
+		if !strings.Contains(cmd, "select-layout") {
+			t.Errorf("expected select-layout, got: %q", cmd)
+		}
+		if !strings.Contains(cmd, "-t mysess:2") {
+			t.Errorf("expected -t mysess:2, got: %q", cmd)
+		}
+		if !strings.Contains(cmd, "bb62,80x24,0,0{40x24,0,0,1,39x24,41,0,2}") {
+			t.Errorf("expected layout string, got: %q", cmd)
+		}
+		ft.lines <- "%begin 1 1 0"
+		ft.lines <- "%end 1 1 0"
+	}()
+
+	err := tmux.SelectLayout("mysess:2", "bb62,80x24,0,0{40x24,0,0,1,39x24,41,0,2}")
+	if err != nil {
+		t.Fatalf("SelectLayout returned error: %v", err)
+	}
+}

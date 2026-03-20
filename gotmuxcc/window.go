@@ -693,6 +693,19 @@ func (t *Tmux) SelectPane(target string) error {
 	return nil
 }
 
+// SelectLayout applies a layout string to a window by target string.
+func (t *Tmux) SelectLayout(target string, layout string) error {
+	_, err := t.query().
+		cmd("select-layout").
+		fargs("-t", target).
+		pargs(layout).
+		run()
+	if err != nil {
+		return fmt.Errorf("failed to select layout: %w", err)
+	}
+	return nil
+}
+
 // SelectWindow selects a window by target string.
 func (t *Tmux) SelectWindow(target string) error {
 	_, err := t.query().
