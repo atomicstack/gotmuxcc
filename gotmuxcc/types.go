@@ -235,6 +235,8 @@ type NewWindowOptions struct {
 	StartDirectory string
 	WindowName     string
 	DoNotAttach    bool
+	Index          *int   // window index within session (-t session:index)
+	ShellCommand   string // startup command (last positional arg)
 }
 
 // SelectPaneOptions customises select-pane behavior.

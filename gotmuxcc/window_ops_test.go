@@ -230,6 +230,81 @@ func TestTmuxSelectPane(t *testing.T) {
 	}
 }
 
+func newTestSession(ft *fakeTransport, r *router) *Session {
+	tmux := &Tmux{transport: ft, router: r}
+	return &Session{Name: "mysess", tmux: tmux}
+}
+
+func TestNewWindowWithIndex(t *testing.T) {
+	ft := newFakeTransport()
+	r := newRouterWithInit(ft, false)
+	defer r.close()
+
+	sess := newTestSession(ft, r)
+	idx := 2
+
+	go func() {
+		cmd := <-ft.sendC
+		if !strings.Contains(cmd, "-t mysess:2") {
+			t.Errorf("expected target mysess:2, got command: %q", cmd)
+		}
+		ft.lines <- "%begin 1 1 0"
+		ft.lines <- "%end 1 1 0"
+	}()
+
+	_, err := sess.NewWindow(&NewWindowOptions{Index: &idx})
+	if err != nil {
+		t.Fatalf("NewWindow returned error: %v", err)
+	}
+}
+
+func TestNewWindowWithIndexZero(t *testing.T) {
+	ft := newFakeTransport()
+	r := newRouterWithInit(ft, false)
+	defer r.close()
+
+	sess := newTestSession(ft, r)
+	idx := 0
+
+	go func() {
+		cmd := <-ft.sendC
+		if !strings.Contains(cmd, "-t mysess:0") {
+			t.Errorf("expected target mysess:0, got command: %q", cmd)
+		}
+		ft.lines <- "%begin 1 1 0"
+		ft.lines <- "%end 1 1 0"
+	}()
+
+	_, err := sess.NewWindow(&NewWindowOptions{Index: &idx})
+	if err != nil {
+		t.Fatalf("NewWindow returned error: %v", err)
+	}
+}
+
+func TestNewWindowWithShellCommand(t *testing.T) {
+	ft := newFakeTransport()
+	r := newRouterWithInit(ft, false)
+	defer r.close()
+
+	sess := newTestSession(ft, r)
+
+	go func() {
+		cmd := <-ft.sendC
+		if !strings.Contains(cmd, "'cat /tmp/pane.txt; exec bash'") {
+			t.Errorf("expected shell command in output, got: %q", cmd)
+		}
+		ft.lines <- "%begin 1 1 0"
+		ft.lines <- "%end 1 1 0"
+	}()
+
+	_, err := sess.NewWindow(&NewWindowOptions{
+		ShellCommand: "cat /tmp/pane.txt; exec bash",
+	})
+	if err != nil {
+		t.Fatalf("NewWindow returned error: %v", err)
+	}
+}
+
 func TestTmuxSelectLayout(t *testing.T) {
 	ft := newFakeTransport()
 	r := newRouterWithInit(ft, false)

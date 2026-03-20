@@ -494,12 +494,17 @@ func (s *Session) GetWindowByIndex(idx int) (*Window, error) {
 
 // NewWindow creates a new window within the session.
 func (s *Session) NewWindow(op *NewWindowOptions) (*Window, error) {
+	target := s.Name
 	q := s.tmux.query().
 		cmd("new-window").
-		fargs("-P", "-t", s.Name).
+		fargs("-P").
 		windowVars()
 
 	if op != nil {
+		if op.Index != nil {
+			target = fmt.Sprintf("%s:%d", s.Name, *op.Index)
+		}
+		q.fargs("-t", target)
 		if op.StartDirectory != "" {
 			q.fargs("-c", op.StartDirectory)
 		}
@@ -509,6 +514,11 @@ func (s *Session) NewWindow(op *NewWindowOptions) (*Window, error) {
 		if op.DoNotAttach {
 			q.fargs("-d")
 		}
+		if op.ShellCommand != "" {
+			q.pargs(fmt.Sprintf("'%s'", op.ShellCommand))
+		}
+	} else {
+		q.fargs("-t", target)
 	}
 
 	output, err := q.run()
