@@ -31,6 +31,10 @@ issuing many tmux operations from Go.
   `ClearWindowSize` for programmatic layout control.
 - **Custom format queries** — `ListSessionsFormat`, `ListWindowsFormat`, and
   `ListPanesFormat` accept arbitrary `-F` format strings and `-f` filters.
+- **Target-string APIs** — `Tmux.SplitWindow`, `Tmux.SelectLayout`,
+  `Tmux.SelectPane`, `Tmux.SelectWindow`, and `Tmux.GlobalOption` accept raw
+  tmux target strings, enabling bulk session/window/pane creation during
+  restore without needing materialized objects.
 - **Debug tracing** — set `GOTMUXCC_TRACE=1` (or component names like
   `router,transport`) to write structured debug logs to a trace file.
 
