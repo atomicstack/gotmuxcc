@@ -239,6 +239,58 @@ func TestCommandErrorPropagation(t *testing.T) {
 	}
 }
 
+func TestGlobalOptionReturnsValue(t *testing.T) {
+	rt := newRecordTransport()
+	tmux := &Tmux{transport: rt}
+	tmux.router = newRouterWithInit(rt, false)
+	defer tmux.Close()
+
+	go func() {
+		cmd := <-rt.sendC
+		if !strings.Contains(cmd, "show-option") {
+			t.Errorf("expected show-option, got: %q", cmd)
+		}
+		if !strings.Contains(cmd, "-g") {
+			t.Errorf("expected -g flag, got: %q", cmd)
+		}
+		if !strings.Contains(cmd, "-q") {
+			t.Errorf("expected -q flag, got: %q", cmd)
+		}
+		if !strings.Contains(cmd, "-v") {
+			t.Errorf("expected -v flag, got: %q", cmd)
+		}
+		rt.respond("%begin 1 1 0", "/home/user/.local/share/tmux", "%end 1 1 0")
+	}()
+
+	val, err := tmux.GlobalOption("@storage-dir")
+	if err != nil {
+		t.Fatalf("GlobalOption returned error: %v", err)
+	}
+	if val != "/home/user/.local/share/tmux" {
+		t.Errorf("expected value '/home/user/.local/share/tmux', got %q", val)
+	}
+}
+
+func TestGlobalOptionReturnsEmptyForUnset(t *testing.T) {
+	rt := newRecordTransport()
+	tmux := &Tmux{transport: rt}
+	tmux.router = newRouterWithInit(rt, false)
+	defer tmux.Close()
+
+	go func() {
+		<-rt.sendC
+		rt.respond("%begin 1 1 0", "%end 1 1 0")
+	}()
+
+	val, err := tmux.GlobalOption("@nonexistent")
+	if err != nil {
+		t.Fatalf("GlobalOption returned error: %v", err)
+	}
+	if val != "" {
+		t.Errorf("expected empty string, got %q", val)
+	}
+}
+
 func TestQuoteArgument(t *testing.T) {
 	tests := []struct {
 		input string

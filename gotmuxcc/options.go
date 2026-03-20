@@ -41,6 +41,22 @@ func (t *Tmux) Option(target, key, level string) (*Option, error) {
 	return newOption(key, raw), nil
 }
 
+// GlobalOption queries a server-level (global) option by key.
+// Returns the value, or empty string if the option is not set.
+// The -q flag suppresses errors for unknown options.
+func (t *Tmux) GlobalOption(key string) (string, error) {
+	q := t.query().
+		cmd("show-option").
+		fargs("-g", "-q", "-v", key)
+
+	output, err := q.run()
+	if err != nil {
+		return "", fmt.Errorf("failed to retrieve global option: %w", err)
+	}
+
+	return strings.TrimSpace(output.raw()), nil
+}
+
 func (t *Tmux) Options(target, level string) ([]*Option, error) {
 	q := t.query().
 		cmd("show-options")
