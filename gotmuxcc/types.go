@@ -249,6 +249,7 @@ type SplitWindowOptions struct {
 	SplitDirection PaneSplitDirection
 	StartDirectory string
 	ShellCommand   string
+	Detached       bool // -d flag (don't move focus to new pane)
 }
 
 // ChooseTreeOptions customises choose-tree behavior.

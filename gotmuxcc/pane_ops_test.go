@@ -256,3 +256,111 @@ func TestTmuxResizePane(t *testing.T) {
 		t.Fatalf("ResizePane returned error: %v", err)
 	}
 }
+
+func TestPaneSplitWindowDetached(t *testing.T) {
+	ft := newFakeTransport()
+	r := newRouterWithInit(ft, false)
+	defer r.close()
+
+	pane := newTestPane(ft, r)
+
+	go func() {
+		cmd := <-ft.sendC
+		if !strings.Contains(cmd, "-d") {
+			t.Errorf("expected -d flag, got: %q", cmd)
+		}
+		if !strings.Contains(cmd, "-t %0") {
+			t.Errorf("expected -t %%0, got: %q", cmd)
+		}
+		ft.lines <- "%begin 1 1 0"
+		ft.lines <- "%end 1 1 0"
+	}()
+
+	err := pane.SplitWindow(&SplitWindowOptions{Detached: true})
+	if err != nil {
+		t.Fatalf("SplitWindow returned error: %v", err)
+	}
+}
+
+func TestTmuxSplitWindow(t *testing.T) {
+	ft := newFakeTransport()
+	r := newRouterWithInit(ft, false)
+	defer r.close()
+
+	tmux := &Tmux{transport: ft, router: r}
+
+	go func() {
+		cmd := <-ft.sendC
+		if !strings.Contains(cmd, "split-window") {
+			t.Errorf("expected split-window command, got: %q", cmd)
+		}
+		if !strings.Contains(cmd, "-t mysess:2") {
+			t.Errorf("expected -t mysess:2, got: %q", cmd)
+		}
+		if !strings.Contains(cmd, "-d") {
+			t.Errorf("expected -d flag, got: %q", cmd)
+		}
+		if !strings.Contains(cmd, "-h") {
+			t.Errorf("expected -h flag, got: %q", cmd)
+		}
+		ft.lines <- "%begin 1 1 0"
+		ft.lines <- "%end 1 1 0"
+	}()
+
+	err := tmux.SplitWindow("mysess:2", &SplitWindowOptions{
+		SplitDirection: PaneSplitDirectionHorizontal,
+		Detached:       true,
+	})
+	if err != nil {
+		t.Fatalf("SplitWindow returned error: %v", err)
+	}
+}
+
+func TestTmuxSplitWindowWithCommand(t *testing.T) {
+	ft := newFakeTransport()
+	r := newRouterWithInit(ft, false)
+	defer r.close()
+
+	tmux := &Tmux{transport: ft, router: r}
+
+	go func() {
+		cmd := <-ft.sendC
+		if !strings.Contains(cmd, "-t mysess:2") {
+			t.Errorf("expected -t mysess:2, got: %q", cmd)
+		}
+		if !strings.Contains(cmd, "'cat /tmp/pane.txt; exec bash'") {
+			t.Errorf("expected shell command, got: %q", cmd)
+		}
+		ft.lines <- "%begin 1 1 0"
+		ft.lines <- "%end 1 1 0"
+	}()
+
+	err := tmux.SplitWindow("mysess:2", &SplitWindowOptions{
+		ShellCommand: "cat /tmp/pane.txt; exec bash",
+	})
+	if err != nil {
+		t.Fatalf("SplitWindow returned error: %v", err)
+	}
+}
+
+func TestTmuxSplitWindowNilOpts(t *testing.T) {
+	ft := newFakeTransport()
+	r := newRouterWithInit(ft, false)
+	defer r.close()
+
+	tmux := &Tmux{transport: ft, router: r}
+
+	go func() {
+		cmd := <-ft.sendC
+		if cmd != "split-window -t mysess:2" {
+			t.Errorf("unexpected command: %q", cmd)
+		}
+		ft.lines <- "%begin 1 1 0"
+		ft.lines <- "%end 1 1 0"
+	}()
+
+	err := tmux.SplitWindow("mysess:2", nil)
+	if err != nil {
+		t.Fatalf("SplitWindow returned error: %v", err)
+	}
+}

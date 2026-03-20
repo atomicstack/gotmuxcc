@@ -214,11 +214,11 @@ func (p *Pane) Select() error {
 	return p.SelectPane(nil)
 }
 
-// SplitWindow splits the pane into another pane.
-func (p *Pane) SplitWindow(op *SplitWindowOptions) error {
-	q := p.tmux.query().
+// splitWindow builds and runs a split-window command for the given target.
+func splitWindow(t *Tmux, target string, op *SplitWindowOptions) error {
+	q := t.query().
 		cmd("split-window").
-		fargs("-t", p.Id)
+		fargs("-t", target)
 
 	if op != nil {
 		if op.SplitDirection != "" {
@@ -226,6 +226,9 @@ func (p *Pane) SplitWindow(op *SplitWindowOptions) error {
 		}
 		if op.StartDirectory != "" {
 			q.fargs("-c", op.StartDirectory)
+		}
+		if op.Detached {
+			q.fargs("-d")
 		}
 		if op.ShellCommand != "" {
 			q.pargs(fmt.Sprintf("'%s'", op.ShellCommand))
@@ -236,6 +239,16 @@ func (p *Pane) SplitWindow(op *SplitWindowOptions) error {
 		return fmt.Errorf("failed to split pane: %w", err)
 	}
 	return nil
+}
+
+// SplitWindow splits a pane by target string.
+func (t *Tmux) SplitWindow(target string, op *SplitWindowOptions) error {
+	return splitWindow(t, target, op)
+}
+
+// SplitWindow splits the pane into another pane.
+func (p *Pane) SplitWindow(op *SplitWindowOptions) error {
+	return splitWindow(p.tmux, p.Id, op)
 }
 
 // Split splits with default options.
