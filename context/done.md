@@ -175,3 +175,11 @@ Here’s what’s happened so far:
   format argument, falling back to `DISPLAY_MESSAGE_TEMPLATE` (the default
   status line format). Now format variables like `#{client_name}` are properly
   single-quoted when passed as fargs values.
+- Added `Index *int` and `ShellCommand string` fields to `NewWindowOptions` for
+  creating windows at specific indices with startup commands.
+- Added `Detached bool` field to `SplitWindowOptions` and new
+  `Tmux.SplitWindow(target, opts)` method for target-string-based pane splitting.
+- Added `Tmux.GlobalOption(key)` method for querying server-level global options
+  via `show-option -gqv`.
+- Added `Tmux.SelectLayout(target, layout)` method for applying layout strings
+  to windows by target string.
