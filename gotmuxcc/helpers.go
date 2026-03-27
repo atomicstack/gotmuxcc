@@ -9,10 +9,7 @@ func checkSessionName(name string) bool {
 	if name == "" {
 		return false
 	}
-	if strings.Contains(name, ":") {
-		return false
-	}
-	if strings.Contains(name, ".") {
+	if strings.ContainsAny(name, ":.\n\r\x00") {
 		return false
 	}
 	return true

@@ -134,7 +134,7 @@ func (t *Tmux) NewSession(op *SessionOptions) (*Session, error) {
 			q.fargs("-y", fmt.Sprintf("%d", op.Height))
 		}
 		if op.ShellCommand != "" {
-			q.pargs(fmt.Sprintf("'%s'", op.ShellCommand))
+			q.pargs(op.ShellCommand)
 		}
 	}
 

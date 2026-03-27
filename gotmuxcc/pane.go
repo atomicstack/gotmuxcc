@@ -231,7 +231,7 @@ func splitWindow(t *Tmux, target string, op *SplitWindowOptions) error {
 			q.fargs("-d")
 		}
 		if op.ShellCommand != "" {
-			q.pargs(fmt.Sprintf("'%s'", op.ShellCommand))
+			q.pargs(op.ShellCommand)
 		}
 	}
 

@@ -73,7 +73,9 @@ func (q *query) build() (string, error) {
 		}
 	}
 
-	parts = append(parts, q.posArgs...)
+	for _, pa := range q.posArgs {
+		parts = append(parts, quoteArgument(pa))
+	}
 
 	return strings.Join(parts, " "), nil
 }

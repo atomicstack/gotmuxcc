@@ -515,7 +515,7 @@ func (s *Session) NewWindow(op *NewWindowOptions) (*Window, error) {
 			q.fargs("-d")
 		}
 		if op.ShellCommand != "" {
-			q.pargs(fmt.Sprintf("'%s'", op.ShellCommand))
+			q.pargs(op.ShellCommand)
 		}
 	} else {
 		q.fargs("-t", target)

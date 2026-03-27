@@ -50,7 +50,7 @@ func TempDir(t testing.TB) string {
 	}
 
 	base := filepath.Join(root, ".testtmp")
-	if err := os.MkdirAll(base, 0o755); err != nil {
+	if err := os.MkdirAll(base, 0o700); err != nil {
 		t.Fatalf("testutil.TempDir: failed to create base directory: %v", err)
 	}
 
