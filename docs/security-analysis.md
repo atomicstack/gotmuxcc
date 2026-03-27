@@ -163,25 +163,61 @@ data to arbitrary paths (limited by process permissions).
 | 9 | **low** | format APIs trust boundary | display.go |
 | 10 | **low** | trace file path injection | trace.go |
 
-## fix plan
+## fixes applied
 
-1. **strip control characters in `quoteArgument`** — reject `\n`, `\r`, `\x00`
-   before quoting. these characters have no valid use in tmux command arguments.
+this branch synthesises fixes from two independent security reviews:
 
-2. **quote positional args in `query.build()`** — apply `quoteArgument` to
-   `posArgs` the same way it is applied to `flagArgs`, closing the quoting gap.
+- `security-hardening` branch (2026-03-27) — primary review, all fixes
+- `codex-security-analysis-2026-03-24` branch (2026-03-24) — additional fixes
+
+where both reviews identified the same issue, the `security-hardening` fix was
+preferred. the codex review contributed two additional fixes not covered by the
+primary review.
+
+### from security-hardening (primary)
+
+1. **strip control characters in `quoteArgument`** — `sanitizeControlArg`
+   removes `\n`, `\r`, `\x00` before quoting (options.go).
+
+2. **quote positional args in `query.build()`** — `quoteArgument` applied to
+   `posArgs` the same way it is applied to `flagArgs` (query.go).
 
 3. **remove manual `ShellCommand` quoting** — the three `'%s'` wrappers become
-   plain `pargs(op.ShellCommand)`, relying on the now-quoting `build()`.
+   plain `pargs(op.ShellCommand)` (session.go, window.go, pane.go).
 
-4. **quote `windowID` in refresh.go** — use `quoteArgument` for the composed
-   `-C` argument.
+4. **quote `windowID` in refresh.go** — `quoteArgument` applied to the composed
+   `-C` argument in `SetWindowSize` and `ClearWindowSize`.
 
-5. **validate subscription names** — reject colons in the `name` parameter.
+5. **validate subscription names** — reject colons in the `name` parameter
+   (subscription.go).
 
-6. **harden `checkSessionName`** — reject control characters.
+6. **harden `checkSessionName`** — reject `\n`, `\r`, `\x00` in addition to
+   `:` and `.` (helpers.go).
 
 7. **defence-in-depth in `transport.Send()`** — reject commands containing
-   embedded newlines at the transport layer as a last line of defence.
+   embedded newlines at the transport layer (transport.go).
 
-8. **tighten file permissions** — trace log to `0600`, test temp dir to `0700`.
+8. **tighten file permissions** — trace log to `0600` (trace.go), test temp dir
+   to `0700` (tempdir.go).
+
+### from codex review (additional)
+
+9. **quote format strings via `quoteArgument`** — the `query.build()` format
+   string was manually wrapped with `fmt.Sprintf("'%s'", format)`, bypassing
+   `sanitizeControlArg`. now uses `quoteArgument(format)` so control characters
+   are stripped consistently (query.go).
+
+10. **route `SetClientSize` through query builder** — converted from raw
+    `fmt.Sprintf`/`runCommand` to use the query builder, consistent with the
+    other refresh-client helpers (refresh.go).
+
+### remaining open items
+
+- the control transport still uses `bufio.Scanner` with a 10 MiB line limit.
+  a process inside a pane can force the client connection to drop by emitting a
+  sufficiently long newline-free line (availability, not injection).
+- format string APIs (`DisplayMessage`, `ListSessionsFormat`, etc.) pass
+  caller-supplied format strings directly to tmux by design — documented as a
+  trust boundary.
+- `GOTMUXCC_TRACE_FILE` allows arbitrary path writes when tracing is enabled
+  and an attacker controls environment variables.

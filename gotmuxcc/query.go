@@ -65,7 +65,7 @@ func (q *query) build() (string, error) {
 			formats[idx] = fmt.Sprintf("#{%s}", variable)
 		}
 		format := strings.Join(formats, querySeparator)
-		format = fmt.Sprintf("'%s'", format)
+		format = quoteArgument(format)
 		if q.command[0] == "display-message" {
 			parts = append(parts, "-p", format)
 		} else {

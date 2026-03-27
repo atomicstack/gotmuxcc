@@ -23,6 +23,23 @@ func TestQueryBuildWithVariables(t *testing.T) {
 	}
 }
 
+func TestQueryBuildQuotesPositionalArgs(t *testing.T) {
+	q := newQuery(&Tmux{})
+	q.cmd("send-keys").
+		fargs("-t", "%0").
+		pargs("printf 'hi'; kill-session")
+
+	built, err := q.build()
+	if err != nil {
+		t.Fatalf("build returned error: %v", err)
+	}
+
+	expected := "send-keys -t %0 'printf '\\''hi'\\''; kill-session'"
+	if built != expected {
+		t.Fatalf("expected %q, got %q", expected, built)
+	}
+}
+
 func TestQueryBuildRequiresCommand(t *testing.T) {
 	q := newQuery(&Tmux{})
 	if _, err := q.build(); err == nil {

@@ -8,8 +8,10 @@ import (
 // SetClientSize sets the overall terminal size for this control client.
 // This is equivalent to `refresh-client -C WxH`.
 func (t *Tmux) SetClientSize(width, height int) error {
-	cmd := fmt.Sprintf("refresh-client -C %dx%d", width, height)
-	_, err := t.runCommand(cmd)
+	_, err := t.query().
+		cmd("refresh-client").
+		fargs("-C", fmt.Sprintf("%dx%d", width, height)).
+		run()
 	if err != nil {
 		return fmt.Errorf("failed to set client size: %w", err)
 	}

@@ -343,6 +343,54 @@ func TestTmuxSplitWindowWithCommand(t *testing.T) {
 	}
 }
 
+func TestTmuxSplitWindowQuotesShellCommand(t *testing.T) {
+	ft := newFakeTransport()
+	r := newRouterWithInit(ft, false)
+	defer r.close()
+
+	tmux := &Tmux{transport: ft, router: r}
+
+	go func() {
+		cmd := <-ft.sendC
+		expected := "split-window -t mysess:2 'printf '\\''hi'\\''; exec bash'"
+		if cmd != expected {
+			t.Errorf("expected %q, got %q", expected, cmd)
+		}
+		ft.lines <- "%begin 1 1 0"
+		ft.lines <- "%end 1 1 0"
+	}()
+
+	err := tmux.SplitWindow("mysess:2", &SplitWindowOptions{
+		ShellCommand: "printf 'hi'; exec bash",
+	})
+	if err != nil {
+		t.Fatalf("SplitWindow returned error: %v", err)
+	}
+}
+
+func TestPaneSendKeysQuotesLine(t *testing.T) {
+	ft := newFakeTransport()
+	r := newRouterWithInit(ft, false)
+	defer r.close()
+
+	pane := newTestPane(ft, r)
+
+	go func() {
+		cmd := <-ft.sendC
+		expected := "send-keys -t %0 'printf '\\''hi'\\''; kill-session'"
+		if cmd != expected {
+			t.Errorf("expected %q, got %q", expected, cmd)
+		}
+		ft.lines <- "%begin 1 1 0"
+		ft.lines <- "%end 1 1 0"
+	}()
+
+	err := pane.SendKeys("printf 'hi'; kill-session")
+	if err != nil {
+		t.Fatalf("SendKeys returned error: %v", err)
+	}
+}
+
 func TestTmuxSplitWindowNilOpts(t *testing.T) {
 	ft := newFakeTransport()
 	r := newRouterWithInit(ft, false)

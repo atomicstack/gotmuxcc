@@ -51,6 +51,29 @@ func TestSetWindowSize(t *testing.T) {
 	}
 }
 
+func TestSetWindowSizeQuotesInjection(t *testing.T) {
+	ft := newFakeTransport()
+	r := newRouterWithInit(ft, false)
+	defer r.close()
+
+	tmux := &Tmux{transport: ft, router: r}
+
+	go func() {
+		cmd := <-ft.sendC
+		expected := "refresh-client -C '@0; kill-server:80x24'"
+		if cmd != expected {
+			t.Errorf("expected %q, got %q", expected, cmd)
+		}
+		ft.lines <- "%begin 1 1 0"
+		ft.lines <- "%end 1 1 0"
+	}()
+
+	err := tmux.SetWindowSize("@0; kill-server", 80, 24)
+	if err != nil {
+		t.Fatalf("SetWindowSize returned error: %v", err)
+	}
+}
+
 func TestClearWindowSize(t *testing.T) {
 	ft := newFakeTransport()
 	r := newRouterWithInit(ft, false)
