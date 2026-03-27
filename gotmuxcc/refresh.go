@@ -8,8 +8,10 @@ import (
 // SetClientSize sets the overall terminal size for this control client.
 // This is equivalent to `refresh-client -C WxH`.
 func (t *Tmux) SetClientSize(width, height int) error {
-	cmd := fmt.Sprintf("refresh-client -C %dx%d", width, height)
-	_, err := t.runCommand(cmd)
+	_, err := t.query().
+		cmd("refresh-client").
+		fargs("-C", fmt.Sprintf("%dx%d", width, height)).
+		run()
 	if err != nil {
 		return fmt.Errorf("failed to set client size: %w", err)
 	}
@@ -20,7 +22,8 @@ func (t *Tmux) SetClientSize(width, height int) error {
 // The windowID should include the @ prefix (e.g. "@0").
 // This is equivalent to `refresh-client -C @wid:WxH`.
 func (t *Tmux) SetWindowSize(windowID string, width, height int) error {
-	cmd := fmt.Sprintf("refresh-client -C %s:%dx%d", windowID, width, height)
+	arg := quoteArgument(fmt.Sprintf("%s:%dx%d", windowID, width, height))
+	cmd := fmt.Sprintf("refresh-client -C %s", arg)
 	_, err := t.runCommand(cmd)
 	if err != nil {
 		return fmt.Errorf("failed to set window size: %w", err)
@@ -32,7 +35,8 @@ func (t *Tmux) SetWindowSize(windowID string, width, height int) error {
 // The windowID should include the @ prefix (e.g. "@0").
 // This is equivalent to `refresh-client -C @wid:`.
 func (t *Tmux) ClearWindowSize(windowID string) error {
-	cmd := fmt.Sprintf("refresh-client -C %s:", windowID)
+	arg := quoteArgument(fmt.Sprintf("%s:", windowID))
+	cmd := fmt.Sprintf("refresh-client -C %s", arg)
 	_, err := t.runCommand(cmd)
 	if err != nil {
 		return fmt.Errorf("failed to clear window size: %w", err)

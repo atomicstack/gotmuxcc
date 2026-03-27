@@ -136,9 +136,26 @@ func quoteArgument(arg string) string {
 	if arg == "" {
 		return "''"
 	}
-	if strings.ContainsAny(arg, " \t\n'\"\\#;{}~") {
+	// strip control characters that could inject commands into the
+	// line-oriented control-mode protocol.
+	arg = sanitizeControlArg(arg)
+	if strings.ContainsAny(arg, " \t'\"\\#;{}~") {
 		escaped := strings.ReplaceAll(arg, "'", "'\\''")
 		return "'" + escaped + "'"
 	}
 	return arg
+}
+
+// sanitizeControlArg removes characters that are unsafe in the tmux
+// control-mode wire protocol: newlines (which split a single command
+// into two), carriage returns, and null bytes.
+func sanitizeControlArg(s string) string {
+	return strings.Map(func(r rune) rune {
+		switch r {
+		case '\n', '\r', '\x00':
+			return -1
+		default:
+			return r
+		}
+	}, s)
 }

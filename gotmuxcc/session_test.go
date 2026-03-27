@@ -139,3 +139,40 @@ func TestSessionAttachDetachHelpers(t *testing.T) {
 		t.Fatalf("Rename returned error: %v", err)
 	}
 }
+
+func TestNewSessionQuotesShellCommand(t *testing.T) {
+	tr := newSimpleTransport()
+	tmux := &Tmux{transport: tr}
+	tmux.router = newRouterWithInit(tr, false)
+	defer tmux.Close()
+
+	go func() {
+		for range tr.sendC {
+			tr.lines <- "%begin 1 1 0"
+			tr.lines <- "'sess-1-:-alert-:-1-:-sess-1-:-created-:-1-:-group-:-2-:-sess-1-:-/tmp-:-stack-:-3'"
+			tr.lines <- "%end 1 1 0"
+		}
+	}()
+
+	_, err := tmux.NewSession(&SessionOptions{
+		Name:         "newsess",
+		ShellCommand: "printf 'hi'; exec bash",
+	})
+	if err != nil {
+		t.Fatalf("NewSession returned error: %v", err)
+	}
+
+	tr.sendMu.Lock()
+	defer tr.sendMu.Unlock()
+	if len(tr.sent) == 0 {
+		t.Fatalf("expected command to be sent")
+	}
+	cmd := tr.sent[0]
+	// shell command must be properly escaped, not raw single-quoted
+	if strings.Contains(cmd, "'printf 'hi'; exec bash'") {
+		t.Fatalf("shell command has unsafe manual quoting: %q", cmd)
+	}
+	if !strings.HasSuffix(cmd, "'printf '\\''hi'\\''; exec bash'") {
+		t.Fatalf("expected properly escaped shell command at end of: %q", cmd)
+	}
+}

@@ -102,7 +102,7 @@ func getWriter() io.Writer {
 			return
 		}
 
-		file, err := os.OpenFile(resolved, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+		file, err := os.OpenFile(resolved, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "[trace] failed to open trace log %q: %v\n", resolved, err)
 			writer = os.Stdout

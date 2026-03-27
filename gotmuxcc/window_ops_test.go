@@ -305,6 +305,32 @@ func TestNewWindowWithShellCommand(t *testing.T) {
 	}
 }
 
+func TestNewWindowQuotesShellCommand(t *testing.T) {
+	ft := newFakeTransport()
+	r := newRouterWithInit(ft, false)
+	defer r.close()
+
+	tmux := &Tmux{transport: ft, router: r}
+	session := &Session{Name: "mysess", tmux: tmux}
+
+	go func() {
+		cmd := <-ft.sendC
+		// shell command with embedded single quotes must be properly escaped
+		if !strings.HasSuffix(cmd, "'printf '\\''hi'\\''; exec bash'") {
+			t.Errorf("expected properly escaped shell command, got %q", cmd)
+		}
+		ft.lines <- "%begin 1 1 0"
+		ft.lines <- "%end 1 1 0"
+	}()
+
+	_, err := session.NewWindow(&NewWindowOptions{
+		ShellCommand: "printf 'hi'; exec bash",
+	})
+	if err != nil {
+		t.Fatalf("NewWindow returned error: %v", err)
+	}
+}
+
 func TestTmuxSelectLayout(t *testing.T) {
 	ft := newFakeTransport()
 	r := newRouterWithInit(ft, false)

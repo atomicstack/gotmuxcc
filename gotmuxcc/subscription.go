@@ -1,6 +1,9 @@
 package gotmuxcc
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // SubscriptionTarget specifies what a subscription monitors.
 type SubscriptionTarget string
@@ -35,6 +38,9 @@ func SubWindow(windowID string) SubscriptionTarget {
 //   - SubWindow("@0"): a specific window
 //   - SubAllWindows: all windows in the session
 func (t *Tmux) Subscribe(name string, target SubscriptionTarget, format string) error {
+	if strings.Contains(name, ":") {
+		return fmt.Errorf("subscription name must not contain colons: %q", name)
+	}
 	arg := fmt.Sprintf("%s:%s:%s", name, string(target), format)
 	_, err := t.runCommand(fmt.Sprintf("refresh-client -B %s", quoteArgument(arg)))
 	if err != nil {

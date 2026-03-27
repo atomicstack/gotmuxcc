@@ -86,6 +86,33 @@ func TestSetOptionCommand(t *testing.T) {
 	}
 }
 
+func TestSetOptionQuotesPositionalArgs(t *testing.T) {
+	rt := newRecordTransport()
+	tmux := &Tmux{transport: rt}
+	tmux.router = newRouterWithInit(rt, false)
+	defer tmux.Close()
+
+	go func() {
+		for range rt.sendC {
+			rt.respond("%begin 1 1 0", "%end 1 1 0")
+		}
+	}()
+
+	if err := tmux.SetOption("target", "@foo; kill-server", "value with spaces", ""); err != nil {
+		t.Fatalf("SetOption returned error: %v", err)
+	}
+
+	rt.sendMu.Lock()
+	defer rt.sendMu.Unlock()
+	if len(rt.sent) == 0 {
+		t.Fatalf("expected command to be sent")
+	}
+	expected := "set-option -t target '@foo; kill-server' 'value with spaces'"
+	if rt.sent[0] != expected {
+		t.Fatalf("expected %q, got %q", expected, rt.sent[0])
+	}
+}
+
 func TestDeleteOptionCommand(t *testing.T) {
 	rt := newRecordTransport()
 	tmux := &Tmux{transport: rt}

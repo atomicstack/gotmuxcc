@@ -143,9 +143,18 @@ func New(ctx context.Context, cfg Config) (*Transport, error) {
 }
 
 // Send writes a command line (with newline appended) to tmux.
+// The line must not contain embedded newlines or carriage returns,
+// as these would inject additional commands into the control-mode protocol.
 func (t *Transport) Send(line string) error {
 	if t == nil {
 		return errors.New("control: transport is nil")
+	}
+
+	// defence-in-depth: reject embedded newlines/carriage returns that
+	// would split a single command into multiple protocol lines.
+	trimmed := strings.TrimRight(line, "\n")
+	if strings.ContainsAny(trimmed, "\n\r") {
+		return errors.New("control: command must not contain embedded newlines")
 	}
 
 	display := trace.FormatControlCommand(line)
