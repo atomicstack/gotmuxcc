@@ -21,3 +21,6 @@ cover.out
 
 # Temporary files
 *~
+
+# Worktrees
+.worktrees/
