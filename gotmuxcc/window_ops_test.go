@@ -240,13 +240,13 @@ func TestNewWindowWithIndex(t *testing.T) {
 	r := newRouterWithInit(ft, false)
 	defer r.close()
 
-	sess := newTestSession(ft, r)
+	sess := &Session{Id: "$1", Name: "mysess", tmux: &Tmux{transport: ft, router: r}}
 	idx := 2
 
 	go func() {
 		cmd := <-ft.sendC
-		if !strings.Contains(cmd, "-t mysess:2") {
-			t.Errorf("expected target mysess:2, got command: %q", cmd)
+		if !strings.Contains(cmd, "-t $1:2") {
+			t.Errorf("expected target $1:2, got command: %q", cmd)
 		}
 		ft.lines <- "%begin 1 1 0"
 		ft.lines <- "%end 1 1 0"
@@ -263,13 +263,13 @@ func TestNewWindowWithIndexZero(t *testing.T) {
 	r := newRouterWithInit(ft, false)
 	defer r.close()
 
-	sess := newTestSession(ft, r)
+	sess := &Session{Id: "$1", Name: "mysess", tmux: &Tmux{transport: ft, router: r}}
 	idx := 0
 
 	go func() {
 		cmd := <-ft.sendC
-		if !strings.Contains(cmd, "-t mysess:0") {
-			t.Errorf("expected target mysess:0, got command: %q", cmd)
+		if !strings.Contains(cmd, "-t $1:0") {
+			t.Errorf("expected target $1:0, got command: %q", cmd)
 		}
 		ft.lines <- "%begin 1 1 0"
 		ft.lines <- "%end 1 1 0"
@@ -328,6 +328,42 @@ func TestNewWindowQuotesShellCommand(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("NewWindow returned error: %v", err)
+	}
+}
+
+func TestSessionWindowNavigationUsesSessionId(t *testing.T) {
+	ft := newFakeTransport()
+	r := newRouterWithInit(ft, false)
+	defer r.close()
+
+	tmux := &Tmux{transport: ft, router: r}
+	session := &Session{Id: "$1", Name: "mysess", tmux: tmux}
+
+	go func() {
+		for range ft.sendC {
+			ft.lines <- "%begin 1 1 0"
+			ft.lines <- "%end 1 1 0"
+		}
+	}()
+
+	if err := session.NextWindow(); err != nil {
+		t.Fatalf("NextWindow returned error: %v", err)
+	}
+	if err := session.PreviousWindow(); err != nil {
+		t.Fatalf("PreviousWindow returned error: %v", err)
+	}
+
+	ft.sendMu.Lock()
+	sent := append([]string(nil), ft.sent...)
+	ft.sendMu.Unlock()
+	if len(sent) != 2 {
+		t.Fatalf("expected 2 commands, got %d", len(sent))
+	}
+	if sent[0] != "next-window -t $1" {
+		t.Fatalf("unexpected next-window command: %q", sent[0])
+	}
+	if sent[1] != "previous-window -t $1" {
+		t.Fatalf("unexpected previous-window command: %q", sent[1])
 	}
 }
 

@@ -494,7 +494,7 @@ func (s *Session) GetWindowByIndex(idx int) (*Window, error) {
 
 // NewWindow creates a new window within the session.
 func (s *Session) NewWindow(op *NewWindowOptions) (*Window, error) {
-	target := s.Name
+	target := s.target()
 	q := s.tmux.query().
 		cmd("new-window").
 		fargs("-P").
@@ -502,7 +502,7 @@ func (s *Session) NewWindow(op *NewWindowOptions) (*Window, error) {
 
 	if op != nil {
 		if op.Index != nil {
-			target = fmt.Sprintf("%s:%d", s.Name, *op.Index)
+			target = s.targetWithWindowIndex(*op.Index)
 		}
 		q.fargs("-t", target)
 		if op.StartDirectory != "" {
@@ -537,7 +537,7 @@ func (s *Session) New() (*Window, error) {
 func (s *Session) NextWindow() error {
 	_, err := s.tmux.query().
 		cmd("next-window").
-		fargs("-t", s.Name).
+		fargs("-t", s.target()).
 		run()
 	if err != nil {
 		return fmt.Errorf("failed to select next window: %w", err)
@@ -549,7 +549,7 @@ func (s *Session) NextWindow() error {
 func (s *Session) PreviousWindow() error {
 	_, err := s.tmux.query().
 		cmd("previous-window").
-		fargs("-t", s.Name).
+		fargs("-t", s.target()).
 		run()
 	if err != nil {
 		return fmt.Errorf("failed to select previous window: %w", err)

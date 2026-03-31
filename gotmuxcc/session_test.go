@@ -114,7 +114,7 @@ func TestSessionAttachDetachHelpers(t *testing.T) {
 	tmux.router = newRouterWithInit(tr, false)
 	defer tmux.Close()
 
-	session := &Session{Name: "sess", tmux: tmux}
+	session := &Session{Id: "$1", Name: "sess", tmux: tmux}
 
 	go func() {
 		for range tr.sendC {
@@ -137,6 +137,111 @@ func TestSessionAttachDetachHelpers(t *testing.T) {
 	}
 	if err := session.Rename("new"); err != nil {
 		t.Fatalf("Rename returned error: %v", err)
+	}
+	if session.Name != "new" {
+		t.Fatalf("expected session name to update after rename, got %q", session.Name)
+	}
+
+	tr.sendMu.Lock()
+	defer tr.sendMu.Unlock()
+	joined := strings.Join(tr.sent, "\n")
+	for _, want := range []string{
+		"attach-session -t $1",
+		"detach-client -s $1",
+		"kill-session -t $1",
+		"rename-session -t $1 new",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("expected command %q in output: %s", want, joined)
+		}
+	}
+}
+
+func TestSessionHelpersFallbackToNameWhenIdMissing(t *testing.T) {
+	tr := newSimpleTransport()
+	tmux := &Tmux{transport: tr}
+	tmux.router = newRouterWithInit(tr, false)
+	defer tmux.Close()
+
+	session := &Session{Name: "sess", tmux: tmux}
+
+	go func() {
+		for range tr.sendC {
+			tr.lines <- "%begin 1 1 0"
+			tr.lines <- "%end 1 1 0"
+		}
+	}()
+
+	if err := session.AttachSession(nil); err != nil {
+		t.Fatalf("AttachSession returned error: %v", err)
+	}
+	if err := session.Detach(); err != nil {
+		t.Fatalf("Detach returned error: %v", err)
+	}
+	if err := session.Kill(); err != nil {
+		t.Fatalf("Kill returned error: %v", err)
+	}
+
+	tr.sendMu.Lock()
+	defer tr.sendMu.Unlock()
+	joined := strings.Join(tr.sent, "\n")
+	for _, want := range []string{
+		"attach-session -t sess",
+		"detach-client -s sess",
+		"kill-session -t sess",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("expected command %q in output: %s", want, joined)
+		}
+	}
+}
+
+func TestSessionOptionHelpersUseSessionIdTarget(t *testing.T) {
+	tr := newSimpleTransport()
+	tmux := &Tmux{transport: tr}
+	tmux.router = newRouterWithInit(tr, false)
+	defer tmux.Close()
+
+	session := &Session{Id: "$1", Name: "sess", tmux: tmux}
+
+	go func() {
+		for cmd := range tr.sendC {
+			tr.lines <- "%begin 1 1 0"
+			if strings.Contains(cmd, "show-option") && strings.Contains(cmd, "-v") {
+				tr.lines <- "value"
+			}
+			if strings.Contains(cmd, "show-options") {
+				tr.lines <- "@foo bar"
+			}
+			tr.lines <- "%end 1 1 0"
+		}
+	}()
+
+	if err := session.SetOption("@foo", "bar"); err != nil {
+		t.Fatalf("SetOption returned error: %v", err)
+	}
+	if _, err := session.Option("@foo"); err != nil {
+		t.Fatalf("Option returned error: %v", err)
+	}
+	if _, err := session.Options(); err != nil {
+		t.Fatalf("Options returned error: %v", err)
+	}
+	if err := session.DeleteOption("@foo"); err != nil {
+		t.Fatalf("DeleteOption returned error: %v", err)
+	}
+
+	tr.sendMu.Lock()
+	defer tr.sendMu.Unlock()
+	joined := strings.Join(tr.sent, "\n")
+	for _, want := range []string{
+		"set-option -t $1 @foo bar",
+		"show-option -t $1 -v @foo",
+		"show-options -t $1",
+		"set-option -t $1 -u @foo",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("expected command %q in output: %s", want, joined)
+		}
 	}
 }
 

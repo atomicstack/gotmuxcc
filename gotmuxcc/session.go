@@ -3,6 +3,7 @@ package gotmuxcc
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 func (q *query) sessionVars() *query {
@@ -57,6 +58,20 @@ func (r queryResult) toSession(t *Tmux) *Session {
 		tmux:              t,
 	}
 	return session
+}
+
+func (s *Session) target() string {
+	if s == nil {
+		return ""
+	}
+	if id := strings.TrimSpace(s.Id); id != "" {
+		return id
+	}
+	return strings.TrimSpace(s.Name)
+}
+
+func (s *Session) targetWithWindowIndex(idx int) string {
+	return fmt.Sprintf("%s:%d", s.target(), idx)
 }
 
 // ListSessions returns all tmux sessions.
@@ -228,7 +243,7 @@ func (s *Session) ListClients() ([]*Client, error) {
 func (s *Session) AttachSession(op *AttachSessionOptions) error {
 	q := s.tmux.query().
 		cmd("attach-session").
-		fargs("-t", s.Name)
+		fargs("-t", s.target())
 
 	if op != nil {
 		if op.DetachClients {
@@ -254,7 +269,7 @@ func (s *Session) Attach() error {
 func (s *Session) Detach() error {
 	_, err := s.tmux.query().
 		cmd("detach-client").
-		fargs("-s", s.Name).
+		fargs("-s", s.target()).
 		run()
 	if err != nil {
 		return fmt.Errorf("failed to detach session: %w", err)
@@ -266,7 +281,7 @@ func (s *Session) Detach() error {
 func (s *Session) Kill() error {
 	_, err := s.tmux.query().
 		cmd("kill-session").
-		fargs("-t", s.Name).
+		fargs("-t", s.target()).
 		run()
 	if err != nil {
 		return fmt.Errorf("failed to kill session: %w", err)
@@ -278,31 +293,32 @@ func (s *Session) Kill() error {
 func (s *Session) Rename(name string) error {
 	_, err := s.tmux.query().
 		cmd("rename-session").
-		fargs("-t", s.Name).
+		fargs("-t", s.target()).
 		pargs(name).
 		run()
 	if err != nil {
 		return fmt.Errorf("failed to rename session: %w", err)
 	}
+	s.Name = name
 	return nil
 }
 
 // SetOption sets a session-scoped option.
 func (s *Session) SetOption(key, value string) error {
-	return s.tmux.SetOption(s.Name, key, value, "")
+	return s.tmux.SetOption(s.target(), key, value, "")
 }
 
 // Option retrieves a session option value.
 func (s *Session) Option(key string) (*Option, error) {
-	return s.tmux.Option(s.Name, key, "")
+	return s.tmux.Option(s.target(), key, "")
 }
 
 // Options lists all session options.
 func (s *Session) Options() ([]*Option, error) {
-	return s.tmux.Options(s.Name, "")
+	return s.tmux.Options(s.target(), "")
 }
 
 // DeleteOption removes a session option.
 func (s *Session) DeleteOption(key string) error {
-	return s.tmux.DeleteOption(s.Name, key, "")
+	return s.tmux.DeleteOption(s.target(), key, "")
 }

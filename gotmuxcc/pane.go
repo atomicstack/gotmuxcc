@@ -139,7 +139,7 @@ func (r queryResult) toPane(t *Tmux) *Pane {
 func (s *Session) ListPanes() ([]*Pane, error) {
 	output, err := s.tmux.query().
 		cmd("list-panes").
-		fargs("-s", "-t", s.Name).
+		fargs("-s", "-t", s.target()).
 		paneVars().
 		run()
 	if err != nil {

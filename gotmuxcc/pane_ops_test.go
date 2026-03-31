@@ -282,6 +282,28 @@ func TestPaneSplitWindowDetached(t *testing.T) {
 	}
 }
 
+func TestSessionListPanesUsesSessionId(t *testing.T) {
+	ft := newFakeTransport()
+	r := newRouterWithInit(ft, false)
+	defer r.close()
+
+	tmux := &Tmux{transport: ft, router: r}
+	session := &Session{Id: "$1", Name: "mysess", tmux: tmux}
+
+	go func() {
+		cmd := <-ft.sendC
+		if !strings.Contains(cmd, "list-panes -s -t $1") {
+			t.Errorf("expected list-panes to use session id, got %q", cmd)
+		}
+		ft.lines <- "%begin 1 1 0"
+		ft.lines <- "%end 1 1 0"
+	}()
+
+	if _, err := session.ListPanes(); err != nil {
+		t.Fatalf("ListPanes returned error: %v", err)
+	}
+}
+
 func TestTmuxSplitWindow(t *testing.T) {
 	ft := newFakeTransport()
 	r := newRouterWithInit(ft, false)

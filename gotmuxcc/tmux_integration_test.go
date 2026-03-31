@@ -200,6 +200,69 @@ func TestSessionLifecycle(t *testing.T) {
 	}
 }
 
+func TestSessionKillUsesExactSessionId(t *testing.T) {
+	tmux := newTestTmux(t)
+
+	base := fmt.Sprintf("sess-overlap-%d", time.Now().UnixNano())
+	name1 := base
+	name2 := base + "2"
+
+	session1, err := tmux.NewSession(&SessionOptions{Name: name1})
+	skipIfUnsupported(t, err)
+	if err != nil {
+		t.Fatalf("NewSession(%q) returned error: %v", name1, err)
+	}
+	defer func() {
+		_ = session1.Kill()
+	}()
+
+	session2, err := tmux.NewSession(&SessionOptions{Name: name2})
+	skipIfUnsupported(t, err)
+	if err != nil {
+		t.Fatalf("NewSession(%q) returned error: %v", name2, err)
+	}
+	defer func() {
+		_ = session2.Kill()
+	}()
+
+	fetched, err := tmux.GetSessionByName(name1)
+	skipIfUnsupported(t, err)
+	if err != nil {
+		t.Fatalf("GetSessionByName returned error: %v", err)
+	}
+	if fetched == nil || fetched.Id == "" {
+		t.Fatalf("expected fetched session with id, got %#v", fetched)
+	}
+
+	if err := fetched.Kill(); err != nil {
+		skipIfUnsupported(t, err)
+		t.Fatalf("Kill returned error: %v", err)
+	}
+
+	remaining, err := tmux.ListSessions()
+	skipIfUnsupported(t, err)
+	if err != nil {
+		t.Fatalf("ListSessions returned error: %v", err)
+	}
+
+	found1 := false
+	found2 := false
+	for _, session := range remaining {
+		if session.Name == name1 {
+			found1 = true
+		}
+		if session.Name == name2 {
+			found2 = true
+		}
+	}
+	if found1 {
+		t.Fatalf("expected session %q to be removed after Kill", name1)
+	}
+	if !found2 {
+		t.Fatalf("expected overlapping session %q to survive Kill", name2)
+	}
+}
+
 func TestSessionDetachAndSwitch(t *testing.T) {
 	tmux := newTestTmux(t)
 
