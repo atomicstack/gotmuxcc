@@ -24,8 +24,9 @@ type Config struct {
 
 // Transport manages a `tmux -C` subprocess and streams its output.
 type Transport struct {
-	cmd   *exec.Cmd
-	stdin io.WriteCloser
+	cmd    *exec.Cmd
+	stdin  io.WriteCloser
+	cancel context.CancelFunc
 
 	lines chan string
 	done  chan error
@@ -59,36 +60,50 @@ func New(ctx context.Context, cfg Config) (*Transport, error) {
 	}
 	args = append(args, cfg.ExtraArgs...)
 
+	// Derive an internal cancelable lifetime from the caller's context. This
+	// gives Close() a second, independent kill path (via exec.CommandContext)
+	// alongside the explicit Process.Kill, and makes a caller-supplied ctx that
+	// cancels — e.g. signal.NotifyContext — tear down the child as well.
+	ctx, cancel := context.WithCancel(ctx)
+
 	cmd := exec.CommandContext(ctx, bin, args...)
+	// Apply platform-specific parent-death cleanup so an abnormal consumer exit
+	// (crash, signal, os.Exit without Close) does not orphan the tmux -C child.
+	cmd.SysProcAttr = sysProcAttr()
 	if len(cfg.Env) > 0 {
 		cmd.Env = append(cmd.Env[:0:0], cfg.Env...)
 	}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
+		cancel()
 		return nil, fmt.Errorf("control: failed to get stdout pipe: %w", err)
 	}
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
+		cancel()
 		return nil, fmt.Errorf("control: failed to get stderr pipe: %w", err)
 	}
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
+		cancel()
 		return nil, fmt.Errorf("control: failed to get stdin pipe: %w", err)
 	}
 
 	if err := cmd.Start(); err != nil {
+		cancel()
 		return nil, fmt.Errorf("control: failed to start tmux: %w", err)
 	}
 	trace.Printf("transport", "tmux process started pid=%d args=%v", cmd.Process.Pid, cmd.Args)
 
 	t := &Transport{
-		cmd:   cmd,
-		stdin: stdin,
-		lines: make(chan string, 128),
-		done:  make(chan error, 1),
+		cmd:    cmd,
+		stdin:  stdin,
+		cancel: cancel,
+		lines:  make(chan string, 128),
+		done:   make(chan error, 1),
 	}
 
 	var wg sync.WaitGroup
@@ -130,6 +145,9 @@ func New(ctx context.Context, cfg Config) (*Transport, error) {
 	go func() {
 		wg.Wait()
 		err := cmd.Wait()
+		// Release the internal context now the process has exited so the
+		// exec.CommandContext watcher goroutine does not linger.
+		cancel()
 		if err != nil && !errors.Is(err, context.Canceled) {
 			t.finish(fmt.Errorf("control: tmux exit: %w", err))
 			trace.Printf("transport", "tmux wait returned err=%v", err)
@@ -210,6 +228,12 @@ func (t *Transport) Close() error {
 		t.sendMu.Lock()
 		t.closing = true
 		t.sendMu.Unlock()
+		// Cancel the lifetime context first: this is an independent kill path
+		// (via exec.CommandContext) that fires even if Process.Kill is racing a
+		// just-exited child.
+		if t.cancel != nil {
+			t.cancel()
+		}
 		_ = t.stdin.Close()
 		if err := t.cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
 			t.finish(fmt.Errorf("control: failed to kill tmux: %w", err))

@@ -45,6 +45,27 @@ func TestNewTmuxWithOptionsDialerError(t *testing.T) {
 	}
 }
 
+func TestNewTmuxContextPassesContext(t *testing.T) {
+	var gotCtx context.Context
+	fakeTransport := newRecordTransport()
+	seedInitialHandshake(fakeTransport)
+	dialer := DialerFunc(func(ctx context.Context, socketPath string) (controlTransport, error) {
+		gotCtx = ctx
+		return fakeTransport, nil
+	})
+
+	type ctxKey struct{}
+	ctx := context.WithValue(context.Background(), ctxKey{}, "value")
+	tmux, err := NewTmuxContext(ctx, "", WithDialer(dialer))
+	if err != nil {
+		t.Fatalf("NewTmuxContext returned error: %v", err)
+	}
+	if gotCtx != ctx {
+		t.Fatalf("expected NewTmuxContext to thread its context to the dialer")
+	}
+	_ = tmux.Close()
+}
+
 func TestWithContextOption(t *testing.T) {
 	var gotCtx context.Context
 	fakeTransport := newRecordTransport()

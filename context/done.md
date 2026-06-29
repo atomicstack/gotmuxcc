@@ -183,3 +183,13 @@ Here’s what’s happened so far:
   via `show-option -gqv`.
 - Added `Tmux.SelectLayout(target, layout)` method for applying layout strings
   to windows by target string.
+- Hardened the control transport against orphaning `tmux -C` on abnormal consumer
+  exit (crash/signal/os.Exit without Close). added build-tagged `sysProcAttr()`
+  helpers: linux sets `Pdeathsig: SIGKILL` (full parent-death cleanup) plus
+  `Setpgid`; darwin/bsd set `Setpgid` only (no pdeathsig equivalent — Close
+  remains mandatory); non-unix returns nil. `New` now also derives an internal
+  cancelable lifetime context that `Close()` cancels, giving a second
+  CommandContext-based kill path. exposed `NewTmuxContext(ctx, socket, ...)` so
+  consumers can bind a client's lifetime to e.g. signal.NotifyContext. documented
+  the macOS Close() requirement on `(*Tmux).Close`. tests cover the platform
+  helpers and constructor threading.

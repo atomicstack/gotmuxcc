@@ -66,6 +66,15 @@ func DefaultTmux() (*Tmux, error) {
 	return NewTmux("")
 }
 
+// NewTmuxContext initializes a Tmux client whose underlying tmux -C subprocess
+// is bound to the supplied context. Cancelling ctx tears down the transport and
+// kills the child, letting consumers tie a client's lifetime to, e.g.,
+// signal.NotifyContext so the child is reaped on shutdown without relying solely
+// on an explicit Close(). Additional options may still be supplied.
+func NewTmuxContext(ctx context.Context, socketPath string, opts ...ConstructorOption) (*Tmux, error) {
+	return NewTmuxWithOptions(socketPath, append([]ConstructorOption{WithContext(ctx)}, opts...)...)
+}
+
 // NewTmuxWithOptions creates a Tmux client with custom constructor options.
 // It blocks until the initial control-mode handshake completes so that
 // subsequent commands are not affected by the startup %begin/%end pair.
@@ -117,7 +126,13 @@ type Tmux struct {
 	router    *router
 }
 
-// Close shuts down the underlying control-mode transport.
+// Close shuts down the underlying control-mode transport and kills the tmux -C
+// subprocess. Always call Close (e.g. via defer) when finished with a client.
+//
+// On Linux the child is also reaped automatically if the process dies without
+// Close (parent-death signal). macOS and the BSDs have no such mechanism, so on
+// those platforms calling Close — or binding the client to a cancelable context
+// via NewTmuxContext — is the only way to avoid orphaning the subprocess.
 func (t *Tmux) Close() error {
 	if t == nil {
 		return nil
