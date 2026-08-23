@@ -3,7 +3,9 @@ package gotmuxcc
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
+	"time"
 )
 
 // controlTransport is the low-level interface used by Tmux to communicate with
@@ -28,8 +30,28 @@ type Dialer interface {
 type ConstructorOption func(*constructorConfig)
 
 type constructorConfig struct {
-	ctx    context.Context
-	dialer Dialer
+	ctx              context.Context
+	dialer           Dialer
+	handshakeTimeout time.Duration
+}
+
+// DefaultHandshakeTimeout bounds how long a constructor waits for tmux to
+// complete the initial control-mode handshake. It exists so that a tmux that
+// neither finishes the handshake nor closes the transport cannot wedge a caller
+// forever; callers arriving via NewTmux or DefaultTmux have no context to
+// cancel, so without a bound their only escape is the transport closing.
+//
+// It is deliberately generous: the handshake is local IPC that normally settles
+// in milliseconds, so this only fires when something is genuinely wrong.
+const DefaultHandshakeTimeout = 10 * time.Second
+
+// WithHandshakeTimeout overrides how long the constructor waits for the initial
+// control-mode handshake. A non-positive duration disables the bound entirely,
+// restoring the previous behaviour of waiting indefinitely.
+func WithHandshakeTimeout(d time.Duration) ConstructorOption {
+	return func(cfg *constructorConfig) {
+		cfg.handshakeTimeout = d
+	}
 }
 
 type DialerFunc func(ctx context.Context, socketPath string) (controlTransport, error)
@@ -81,8 +103,9 @@ func NewTmuxContext(ctx context.Context, socketPath string, opts ...ConstructorO
 // subsequent commands are not affected by the startup %begin/%end pair.
 func NewTmuxWithOptions(socketPath string, opts ...ConstructorOption) (*Tmux, error) {
 	cfg := constructorConfig{
-		ctx:    context.Background(),
-		dialer: defaultDialer{},
+		ctx:              context.Background(),
+		dialer:           defaultDialer{},
+		handshakeTimeout: DefaultHandshakeTimeout,
 	}
 	for _, opt := range opts {
 		opt(&cfg)
@@ -109,12 +132,27 @@ func NewTmuxWithOptions(socketPath string, opts ...ConstructorOption) (*Tmux, er
 
 	// Wait for the initial %begin/%end from the attach/new-session to
 	// be consumed so that the first user command isn't mismatched.
+	//
+	// A tmux that neither completes the handshake nor closes the transport
+	// would otherwise block here forever, which matters most for NewTmux and
+	// DefaultTmux callers: they get context.Background(), so the closed channel
+	// is their only other escape.
+	var timeout <-chan time.Time
+	if cfg.handshakeTimeout > 0 {
+		timer := time.NewTimer(cfg.handshakeTimeout)
+		defer timer.Stop()
+		timeout = timer.C
+	}
+
 	select {
 	case <-t.router.ready:
 	case <-t.router.closed:
 	case <-cfg.ctx.Done():
 		_ = transport.Close()
 		return nil, cfg.ctx.Err()
+	case <-timeout:
+		_ = transport.Close()
+		return nil, fmt.Errorf("gotmuxcc: timed out after %s waiting for the tmux control-mode handshake", cfg.handshakeTimeout)
 	}
 
 	return t, nil
