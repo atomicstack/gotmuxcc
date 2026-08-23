@@ -1,6 +1,7 @@
 package gotmuxcc
 
 import (
+	"context"
 	"fmt"
 	"strings"
 )
@@ -28,10 +29,15 @@ func (t *Tmux) DisplayMessage(target, format string) (string, error) {
 // returns the raw output lines. This allows callers to use arbitrary -F
 // format strings instead of the structured ListSessions() method.
 func (t *Tmux) ListSessionsFormat(format string) ([]string, error) {
+	return t.ListSessionsFormatContext(context.Background(), format)
+}
+
+// ListSessionsFormatContext is ListSessionsFormat with cancellation.
+func (t *Tmux) ListSessionsFormatContext(ctx context.Context, format string) ([]string, error) {
 	q := t.query().
 		cmd("list-sessions").
 		fargs("-F", format)
-	result, err := q.run()
+	result, err := q.runContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list sessions: %w", err)
 	}
@@ -45,6 +51,11 @@ func (t *Tmux) ListSessionsFormat(format string) ([]string, error) {
 // If target is empty, -a is used to list all windows.
 // If filter is non-empty, it is passed via -f.
 func (t *Tmux) ListWindowsFormat(target, filter, format string) ([]string, error) {
+	return t.ListWindowsFormatContext(context.Background(), target, filter, format)
+}
+
+// ListWindowsFormatContext is ListWindowsFormat with cancellation.
+func (t *Tmux) ListWindowsFormatContext(ctx context.Context, target, filter, format string) ([]string, error) {
 	q := t.query().cmd("list-windows")
 	if target != "" {
 		q.fargs("-t", target)
@@ -56,7 +67,7 @@ func (t *Tmux) ListWindowsFormat(target, filter, format string) ([]string, error
 	}
 	q.fargs("-F", format)
 
-	result, err := q.run()
+	result, err := q.runContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list windows: %w", err)
 	}
@@ -70,6 +81,11 @@ func (t *Tmux) ListWindowsFormat(target, filter, format string) ([]string, error
 // If target is empty, -a is used to list all panes.
 // If filter is non-empty, it is passed via -f.
 func (t *Tmux) ListPanesFormat(target, filter, format string) ([]string, error) {
+	return t.ListPanesFormatContext(context.Background(), target, filter, format)
+}
+
+// ListPanesFormatContext is ListPanesFormat with cancellation.
+func (t *Tmux) ListPanesFormatContext(ctx context.Context, target, filter, format string) ([]string, error) {
 	q := t.query().cmd("list-panes")
 	if target != "" {
 		q.fargs("-t", target)
@@ -81,7 +97,7 @@ func (t *Tmux) ListPanesFormat(target, filter, format string) ([]string, error) 
 	}
 	q.fargs("-F", format)
 
-	result, err := q.run()
+	result, err := q.runContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list panes: %w", err)
 	}

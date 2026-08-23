@@ -141,6 +141,7 @@ type Tmux struct {
 // Close (parent-death signal). macOS and the BSDs have no such mechanism, so on
 // those platforms calling Close — or binding the client to a cancelable context
 // via NewTmuxContext — is the only way to avoid orphaning the subprocess.
+//
 // Close is safe to call concurrently with in-flight commands and safe to call
 // more than once; repeat calls return the same error as the first.
 //
@@ -172,10 +173,14 @@ func (t *Tmux) events() <-chan Event {
 }
 
 func (t *Tmux) runCommand(command string) (commandResult, error) {
+	return t.runCommandContext(context.Background(), command)
+}
+
+func (t *Tmux) runCommandContext(ctx context.Context, command string) (commandResult, error) {
 	if t == nil || t.router == nil {
 		return commandResult{}, errRouterClosed
 	}
-	return t.router.runCommand(command)
+	return t.router.runCommandContext(ctx, command)
 }
 
 func (t *Tmux) query() *query {

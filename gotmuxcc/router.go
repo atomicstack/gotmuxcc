@@ -1,6 +1,7 @@
 package gotmuxcc
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -63,6 +64,22 @@ func (cr *commandRequest) fail(err error) {
 func (cr *commandRequest) wait() (commandResult, error) {
 	resp := <-cr.reply
 	return resp.result, resp.err
+}
+
+// waitContext waits for the reply, abandoning it if ctx is done first.
+//
+// Abandoning is purely caller-side: the command has already been written to
+// tmux and cannot be unsent, so the request stays in the router's pending or
+// inflight bookkeeping and its eventual reply is discarded. Removing it would
+// desynchronise response correlation, which pairs each %begin with pending[0].
+// The reply channel is buffered, so the router never blocks writing to it.
+func (cr *commandRequest) waitContext(ctx context.Context) (commandResult, error) {
+	select {
+	case resp := <-cr.reply:
+		return resp.result, resp.err
+	case <-ctx.Done():
+		return commandResult{}, ctx.Err()
+	}
 }
 
 type commandState struct {
@@ -607,8 +624,15 @@ func (r *router) enqueue(req *commandRequest) error {
 }
 
 func (r *router) runCommand(cmd string) (commandResult, error) {
+	return r.runCommandContext(context.Background(), cmd)
+}
+
+func (r *router) runCommandContext(ctx context.Context, cmd string) (commandResult, error) {
 	if cmd = strings.TrimSpace(cmd); cmd == "" {
 		return commandResult{}, errEmptyCommand
+	}
+	if err := ctx.Err(); err != nil {
+		return commandResult{}, err
 	}
 
 	trace.Printf("router", "dispatch -> %s", trace.FormatControlCommand(cmd))
@@ -618,7 +642,7 @@ func (r *router) runCommand(cmd string) (commandResult, error) {
 		return commandResult{}, err
 	}
 
-	return req.wait()
+	return req.waitContext(ctx)
 }
 
 func (r *router) eventsChannel() <-chan Event {

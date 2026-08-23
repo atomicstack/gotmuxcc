@@ -1,6 +1,7 @@
 package gotmuxcc
 
 import (
+	"context"
 	"fmt"
 	"strings"
 )
@@ -89,11 +90,17 @@ func (t *Tmux) DeleteOption(target, key, level string) error {
 }
 
 func (t *Tmux) Command(parts ...string) (string, error) {
+	return t.CommandContext(context.Background(), parts...)
+}
+
+// CommandContext is Command with cancellation. It is the raw escape hatch, so a
+// context here also covers the helpers that route through it.
+func (t *Tmux) CommandContext(ctx context.Context, parts ...string) (string, error) {
 	command, err := buildCommand(parts)
 	if err != nil {
 		return "", err
 	}
-	result, err := t.runCommand(command)
+	result, err := t.runCommandContext(ctx, command)
 	if err != nil {
 		return "", fmt.Errorf("failed to run command: %w", err)
 	}

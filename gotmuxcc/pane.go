@@ -1,6 +1,9 @@
 package gotmuxcc
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+)
 
 func (q *query) paneVars() *query {
 	return q.vars(
@@ -58,6 +61,13 @@ func (q *query) paneVars() *query {
 
 // CapturePane runs the tmux capture-pane command against the provided target.
 func (t *Tmux) CapturePane(target string, op *CaptureOptions) (string, error) {
+	return t.CapturePaneContext(context.Background(), target, op)
+}
+
+// CapturePaneContext is CapturePane with cancellation. Pane previews are the
+// most latency-sensitive call in a polling consumer, so this is the one most
+// worth abandoning when a refresh is superseded.
+func (t *Tmux) CapturePaneContext(ctx context.Context, target string, op *CaptureOptions) (string, error) {
 	q := t.query().cmd("capture-pane")
 	if target != "" {
 		q.fargs("-t", target)
@@ -88,7 +98,7 @@ func (t *Tmux) CapturePane(target string, op *CaptureOptions) (string, error) {
 		}
 	}
 
-	output, err := q.run()
+	output, err := q.runContext(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to capture pane: %w", err)
 	}

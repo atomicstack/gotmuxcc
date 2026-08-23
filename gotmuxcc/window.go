@@ -1,6 +1,7 @@
 package gotmuxcc
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -96,11 +97,15 @@ func (r queryResult) toWindow(t *Tmux) *Window {
 
 // ListPanes returns the panes in this window.
 func (w *Window) ListPanes() ([]*Pane, error) {
+	return w.listPanesContext(context.Background())
+}
+
+func (w *Window) listPanesContext(ctx context.Context) ([]*Pane, error) {
 	output, err := w.tmux.query().
 		cmd("list-panes").
 		fargs("-t", w.Id).
 		paneVars().
-		run()
+		runContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list panes: %w", err)
 	}
@@ -264,16 +269,22 @@ func (w *Window) ListActiveClients() ([]*Client, error) {
 
 // ListAllWindows lists all tmux windows across sessions.
 func (t *Tmux) ListAllWindows() ([]*Window, error) {
-	windows, directErr := t.listAllWindowsDirect()
+	return t.ListAllWindowsContext(context.Background())
+}
+
+// ListAllWindowsContext is ListAllWindows with cancellation. The context covers
+// every command in the fallback chain, not just the first.
+func (t *Tmux) ListAllWindowsContext(ctx context.Context) ([]*Window, error) {
+	windows, directErr := t.listAllWindowsDirect(ctx)
 	windowMap := make(map[string]*Window, len(windows))
 	for _, w := range windows {
 		windowMap[w.Id] = w
 	}
 
-	sessions, err := t.ListSessions()
+	sessions, err := t.ListSessionsContext(ctx)
 	if err == nil {
 		for _, session := range sessions {
-			ws, serr := session.ListWindows()
+			ws, serr := session.listWindowsContext(ctx)
 			if serr != nil {
 				continue
 			}
@@ -298,12 +309,12 @@ func (t *Tmux) ListAllWindows() ([]*Window, error) {
 	return windows, nil
 }
 
-func (t *Tmux) listAllWindowsDirect() ([]*Window, error) {
+func (t *Tmux) listAllWindowsDirect(ctx context.Context) ([]*Window, error) {
 	output, err := t.query().
 		cmd("list-windows").
 		fargs("-a").
 		windowVars().
-		run()
+		runContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list all windows: %w", err)
 	}
@@ -313,16 +324,22 @@ func (t *Tmux) listAllWindowsDirect() ([]*Window, error) {
 
 // ListAllPanes lists all panes across sessions.
 func (t *Tmux) ListAllPanes() ([]*Pane, error) {
-	panes, directErr := t.listAllPanesDirect()
+	return t.ListAllPanesContext(context.Background())
+}
+
+// ListAllPanesContext is ListAllPanes with cancellation. The context covers
+// every command in the fallback chain, not just the first.
+func (t *Tmux) ListAllPanesContext(ctx context.Context) ([]*Pane, error) {
+	panes, directErr := t.listAllPanesDirect(ctx)
 	paneMap := make(map[string]*Pane, len(panes))
 	for _, p := range panes {
 		paneMap[p.Id] = p
 	}
 
-	windows, err := t.ListAllWindows()
+	windows, err := t.ListAllWindowsContext(ctx)
 	if err == nil {
 		for _, window := range windows {
-			ps, serr := window.ListPanes()
+			ps, serr := window.listPanesContext(ctx)
 			if serr != nil {
 				continue
 			}
@@ -344,12 +361,12 @@ func (t *Tmux) ListAllPanes() ([]*Pane, error) {
 	return panes, nil
 }
 
-func (t *Tmux) listAllPanesDirect() ([]*Pane, error) {
+func (t *Tmux) listAllPanesDirect(ctx context.Context) ([]*Pane, error) {
 	output, err := t.query().
 		cmd("list-panes").
 		fargs("-a").
 		paneVars().
-		run()
+		runContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list all panes: %w", err)
 	}
@@ -391,6 +408,10 @@ func (t *Tmux) GetClient() (*Client, error) {
 
 // ListWindows returns the windows belonging to a session.
 func (s *Session) ListWindows() ([]*Window, error) {
+	return s.listWindowsContext(context.Background())
+}
+
+func (s *Session) listWindowsContext(ctx context.Context) ([]*Window, error) {
 	targets := []string{}
 	if id := strings.TrimSpace(s.Id); id != "" {
 		targets = append(targets, id)
@@ -401,7 +422,7 @@ func (s *Session) ListWindows() ([]*Window, error) {
 
 	var lastErr error
 	for _, target := range targets {
-		windows, err := s.listWindowsWithTarget(target)
+		windows, err := s.listWindowsWithTarget(ctx, target)
 		if err == nil {
 			return windows, nil
 		}
@@ -423,12 +444,12 @@ func (s *Session) ListWindows() ([]*Window, error) {
 	return []*Window{}, nil
 }
 
-func (s *Session) listWindowsWithTarget(target string) ([]*Window, error) {
+func (s *Session) listWindowsWithTarget(ctx context.Context, target string) ([]*Window, error) {
 	output, err := s.tmux.query().
 		cmd("list-windows").
 		fargs("-t", target).
 		windowVars().
-		run()
+		runContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list windows: %w", err)
 	}

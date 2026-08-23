@@ -1,6 +1,7 @@
 package gotmuxcc
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -81,12 +82,16 @@ func (q *query) build() (string, error) {
 }
 
 func (q *query) run() (*queryOutput, error) {
+	return q.runContext(context.Background())
+}
+
+func (q *query) runContext(ctx context.Context) (*queryOutput, error) {
 	command, err := q.build()
 	if err != nil {
 		return nil, err
 	}
 
-	result, err := q.tmux.runCommand(command)
+	result, err := q.tmux.runCommandContext(ctx, command)
 	if err != nil {
 		return nil, err
 	}

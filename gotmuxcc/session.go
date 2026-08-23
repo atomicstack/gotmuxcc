@@ -1,6 +1,7 @@
 package gotmuxcc
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -76,10 +77,17 @@ func (s *Session) targetWithWindowIndex(idx int) string {
 
 // ListSessions returns all tmux sessions.
 func (t *Tmux) ListSessions() ([]*Session, error) {
+	return t.ListSessionsContext(context.Background())
+}
+
+// ListSessionsContext is ListSessions with cancellation. If ctx is done before
+// tmux replies the call returns ctx.Err(); the command itself has already been
+// written to tmux and simply has its reply discarded.
+func (t *Tmux) ListSessionsContext(ctx context.Context) ([]*Session, error) {
 	output, err := t.query().
 		cmd("list-sessions").
 		sessionVars().
-		run()
+		runContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list sessions: %w", err)
 	}
