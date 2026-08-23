@@ -109,9 +109,12 @@ func New(ctx context.Context, cfg Config) (*Transport, error) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	// Forward stdout lines.
+	// Forward stdout lines. This goroutine is the only sender on t.lines, so it
+	// is also the only thing allowed to close it: closing from finish() instead
+	// would panic whenever this goroutine happened to be parked on a send.
 	go func() {
 		defer wg.Done()
+		defer close(t.lines)
 		scanner := bufio.NewScanner(stdout)
 		scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
 		for scanner.Scan() {
@@ -259,7 +262,8 @@ func (t *Transport) finish(err error) {
 			t.closeErr = err
 		}
 	}
-	close(t.lines)
+	// t.lines is closed by the stdout forwarder, which owns it as sole sender.
+	// Closing it here would race that goroutine and panic if it were mid-send.
 	t.done <- t.closeErr
 	close(t.done)
 	trace.Printf("transport", "finish complete err=%v closing=%v finished=%v", t.closeErr, t.closing, t.finished)
