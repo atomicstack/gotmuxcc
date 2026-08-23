@@ -73,7 +73,11 @@ func TestHandleExitFailsPendingCommands(t *testing.T) {
 	}
 }
 
-func TestHandleExitFailsInflightCommands(t *testing.T) {
+// TestHandleExitInsideBlockIsCommandOutput asserts %exit is only honoured at
+// depth 0. tmux prints it from the client process after proc_loop returns, so
+// inside an open block it is always command output (typically capture-pane
+// content) and must not tear the connection down.
+func TestHandleExitInsideBlockIsCommandOutput(t *testing.T) {
 	ft := newFakeTransport()
 	r := newRouterWithInit(ft, false)
 	defer r.close()
@@ -81,6 +85,28 @@ func TestHandleExitFailsInflightCommands(t *testing.T) {
 	go func() {
 		<-ft.sendC
 		ft.lines <- "%begin 1 1 0"
+		ft.lines <- "%exit detached"
+		ft.lines <- "%end 1 1 0"
+	}()
+
+	result, err := r.runCommand("capture-pane -p -t %1")
+	if err != nil {
+		t.Fatalf("runCommand returned error: %v", err)
+	}
+	if len(result.Lines) != 1 || result.Lines[0] != "%exit detached" {
+		t.Fatalf("unexpected result lines: %#v", result.Lines)
+	}
+}
+
+func TestHandleExitFailsInflightCommands(t *testing.T) {
+	ft := newFakeTransport()
+	r := newRouterWithInit(ft, false)
+	defer r.close()
+
+	// The command's block never opens: tmux exits between accepting the
+	// command and running it, so %exit arrives at depth 0.
+	go func() {
+		<-ft.sendC
 		ft.lines <- "%exit detached"
 	}()
 

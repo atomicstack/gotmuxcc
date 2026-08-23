@@ -19,6 +19,25 @@
   `quoteArgument()` to posArgs too (would require removing the manual quoting at all
   call sites).
 
+- **`%begin` flags hardening is deliberately soft**: `handleBegin` refuses to pair
+  a `%begin` whose flags field is not `1` with a queued request only while the
+  initial attach block is still outstanding. tmux sets that field from
+  `!!(state->flags & CMDQ_STATE_CONTROL)` (verified back to 3.0a), so a strict
+  "flags must be 1" rule would be more defensive — but it would make gotmuxcc hang
+  on any tmux that ever emitted `0` for a typed command, and it would require
+  rewriting all 112 `%begin … 0` fixtures in the unit tests. Revisit if a minimum
+  tmux version is ever declared.
+
+- **Upstream, not gotmuxcc — `capture-pane -p` truncates at NUL**: tmux writes the
+  buffer with `control_write(c, "%.*s", (int)len, buf)` (`cmd-capture-pane.c:441`)
+  while `control_write_line` does `strlen(line)` (`control.c:398`), so captured
+  content containing a NUL byte is silently truncated. Nothing gotmuxcc can do;
+  recorded so it isn't re-diagnosed as a library bug.
+
+- **`gofmt` reports `gotmuxcc/conversion_test.go`**: four map entries in the
+  window-conversion fixture are indented with one tab instead of two. Pre-existing
+  (present at `440c9d0`), whitespace only.
+
 ## Remaining tmux control-mode feature gaps
 These were identified by comparing gotmuxcc against the tmux C source and have
 not yet been implemented:

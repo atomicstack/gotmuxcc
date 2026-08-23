@@ -193,3 +193,15 @@ Here’s what’s happened so far:
   consumers can bind a client's lifetime to e.g. signal.NotifyContext. documented
   the macOS Close() requirement on `(*Tmux).Close`. tests cover the platform
   helpers and constructor threading.
+- Hardened the router's control-mode framing so pane content can never be parsed
+  as protocol (`gotmuxcc/router.go`). While a `%begin` block is open every line is
+  now command output until the exact `%end`/`%error` guard for that block arrives
+  — matching the contract tmux asserts in `regress/control-notify-guard.sh` after
+  upstream `6db5175e` queued notifications out of guard blocks. Previously a
+  `capture-pane -p` line starting `%exit` tore the whole connection down, a
+  captured `%begin` mis-bound the next queued request, and a captured `%end` whose
+  command number collided completed a command early. Guards are now matched as
+  whole keywords (so `%beginning`/`%errors`/`%exited` stay notifications) and must
+  carry exactly three decimal fields; `%exit` is only honoured at depth 0. A
+  `%begin` whose flags field is not `1` is never paired with a queued request,
+  since tmux sets that field only for commands the control client typed.

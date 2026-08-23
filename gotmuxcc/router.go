@@ -23,6 +23,10 @@ var (
 	ErrServerExit = errors.New("gotmuxcc: server sent %exit")
 )
 
+// controlGuardFlags is the flags field tmux writes on the %begin/%end/%error
+// guards of commands typed by this control client.
+const controlGuardFlags = "1"
+
 // Event represents an asynchronous notification emitted by tmux control mode.
 type Event struct {
 	Name   string   // event name without leading '%'
@@ -185,36 +189,79 @@ func (r *router) handleLine(line string) {
 		return
 	}
 
-	switch {
-	case strings.HasPrefix(line, "%begin"):
-		r.handleBegin(line)
-	case strings.HasPrefix(line, "%end"):
-		r.handleEnd(line)
-	case strings.HasPrefix(line, "%error"):
-		r.handleError(line)
-	case strings.HasPrefix(line, "%exit"):
-		r.handleExit(line)
-	case strings.HasPrefix(line, "%"):
-		// When inside a command response (stack non-empty), treat
-		// %-prefixed lines as command output rather than events.
-		// tmux does not escape command output (e.g. capture-pane -p),
-		// so pane content containing lines starting with % would
-		// otherwise be silently consumed as notifications.
-		r.mu.Lock()
-		inflight := len(r.stack) > 0
-		r.mu.Unlock()
-		if inflight {
-			r.appendOutput(line)
-		} else {
-			r.emitEvent(parseEvent(line))
-		}
-	default:
+	if !strings.HasPrefix(line, "%") {
 		r.appendOutput(line)
+		return
+	}
+
+	// tmux does not escape command output (e.g. capture-pane -p), and since
+	// tmux 6db5175e notifications are queued so they can never appear inside
+	// an open block. So while a block is open every line is content until the
+	// exact closing guard for that block arrives — matching the contract
+	// upstream asserts in regress/control-notify-guard.sh. Without this a pane
+	// displaying a control-mode transcript could complete, mis-bind or tear
+	// down real requests.
+	if open, endGuard, errorGuard := r.openBlockGuards(); open {
+		switch line {
+		case endGuard:
+			r.handleEnd(line)
+		case errorGuard:
+			r.handleError(line)
+		default:
+			r.appendOutput(line)
+		}
+		return
+	}
+
+	switch {
+	case isGuardLine(line, "%begin"):
+		r.handleBegin(line)
+	case isGuardLine(line, "%end"):
+		r.handleEnd(line)
+	case isGuardLine(line, "%error"):
+		r.handleError(line)
+	case isGuardLine(line, "%exit"):
+		// %exit is written by the client process after proc_loop returns
+		// (client.c), so it can only legitimately arrive at depth 0.
+		r.handleExit(line)
+	default:
+		r.emitEvent(parseEvent(line))
 	}
 }
 
+// openBlockGuards reports whether a %begin block is currently open and, if so,
+// the exact %end and %error lines that close it. tmux writes the closing guard
+// with the same (time, number, flags) triple as the opening one, so matching on
+// the command number alone would let colliding pane content close the block.
+func (r *router) openBlockGuards() (open bool, endGuard, errorGuard string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if len(r.stack) == 0 {
+		return false, "", ""
+	}
+
+	state := r.inflight[r.stack[len(r.stack)-1]]
+	if state == nil {
+		// The block is open but its state is gone; nothing can close it, so
+		// treat every line as output rather than guessing.
+		return true, "", ""
+	}
+
+	fields := " " + state.time + " " + state.number + " " + state.flags
+	return true, "%end" + fields, "%error" + fields
+}
+
+// isGuardLine reports whether line is the guard keyword on its own or followed
+// by a space. tmux emits guards from a single
+// xasprintf(&line, "%%%s %ld %u %d", ...) in control_write_guard, so a prefix
+// match would also accept notifications such as %beginning or %exited.
+func isGuardLine(line, keyword string) bool {
+	return line == keyword || strings.HasPrefix(line, keyword+" ")
+}
+
 func (r *router) handleBegin(line string) {
-	timeStr, number, flags, _, err := parseFrame(line, "%begin")
+	timeStr, number, flags, err := parseFrame(line, "%begin")
 	if err != nil {
 		r.emitEvent(eventForError("malformed-begin", line, err))
 		return
@@ -227,10 +274,16 @@ func (r *router) handleBegin(line string) {
 		return
 	}
 
-	if len(r.pending) == 0 {
+	// tmux sets the guard flags field from
+	// !!(state->flags & CMDQ_STATE_CONTROL) (cmd-queue.c), so it is 1 only for
+	// commands this control client typed. The implicit block for the
+	// attach-session/new-session on tmux's own command line carries 0 and must
+	// never be paired with a queued request.
+	awaitingInitial := r.initialCmd && !r.initialDone
+	if len(r.pending) == 0 || (flags != controlGuardFlags && awaitingInitial) {
 		// If we're still waiting for the initial command response,
 		// track it so its output and %end are consumed cleanly.
-		if r.initialCmd && !r.initialDone {
+		if awaitingInitial {
 			trace.Printf("router", "begin <- #%s (initial command)", number)
 			r.inflight[number] = &commandState{
 				request: newCommandRequest("(initial)"),
@@ -260,7 +313,7 @@ func (r *router) handleBegin(line string) {
 }
 
 func (r *router) handleEnd(line string) {
-	timeStr, number, flags, _, err := parseFrame(line, "%end")
+	timeStr, number, flags, err := parseFrame(line, "%end")
 	if err != nil {
 		r.emitEvent(eventForError("malformed-end", line, err))
 		return
@@ -269,7 +322,7 @@ func (r *router) handleEnd(line string) {
 }
 
 func (r *router) handleError(line string) {
-	timeStr, number, flags, _, err := parseFrame(line, "%error")
+	timeStr, number, flags, err := parseFrame(line, "%error")
 	if err != nil {
 		r.emitEvent(eventForError("malformed-error", line, err))
 		return
@@ -580,25 +633,42 @@ func (r *router) close() error {
 	return nil
 }
 
-func parseFrame(line, prefix string) (timeStr, number, flags, rest string, err error) {
-	if !strings.HasPrefix(line, prefix) {
-		return "", "", "", "", fmt.Errorf("unexpected prefix for %s: %q", prefix, line)
+// parseFrame parses a control-mode guard line. tmux writes guards as the
+// keyword plus exactly three integers (time, command number, flags) from one
+// format string, so anything else is pane content rather than protocol.
+func parseFrame(line, prefix string) (timeStr, number, flags string, err error) {
+	if !isGuardLine(line, prefix) {
+		return "", "", "", fmt.Errorf("unexpected prefix for %s: %q", prefix, line)
 	}
 
-	payload := strings.TrimSpace(strings.TrimPrefix(line, prefix))
-	parts := strings.SplitN(payload, " ", 4)
-	if len(parts) < 3 {
-		return "", "", "", "", fmt.Errorf("malformed %s line: %q", prefix, line)
+	payload := strings.TrimPrefix(line, prefix)
+	if !strings.HasPrefix(payload, " ") {
+		return "", "", "", fmt.Errorf("malformed %s line: %q", prefix, line)
 	}
 
-	timeStr = parts[0]
-	number = parts[1]
-	flags = parts[2]
-	if len(parts) == 4 {
-		rest = strings.TrimSpace(parts[3])
+	parts := strings.Split(payload[1:], " ")
+	if len(parts) != 3 {
+		return "", "", "", fmt.Errorf("malformed %s line: %q", prefix, line)
+	}
+	for _, part := range parts {
+		if !isUnsignedDecimal(part) {
+			return "", "", "", fmt.Errorf("malformed %s line: %q", prefix, line)
+		}
 	}
 
-	return timeStr, number, flags, rest, nil
+	return parts[0], parts[1], parts[2], nil
+}
+
+func isUnsignedDecimal(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func parseEvent(line string) Event {
