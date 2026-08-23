@@ -84,13 +84,7 @@ func (t *Tmux) ListSessions() ([]*Session, error) {
 		return nil, fmt.Errorf("failed to list sessions: %w", err)
 	}
 
-	results := output.collect()
-	sessions := make([]*Session, 0, len(results))
-	for _, item := range results {
-		sessions = append(sessions, item.toSession(t))
-	}
-
-	return sessions, nil
+	return collectAs(output, t, queryResult.toSession), nil
 }
 
 // HasSession returns true if the session exists.
@@ -109,13 +103,7 @@ func (t *Tmux) GetSessionByName(name string) (*Session, error) {
 		return nil, fmt.Errorf("failed to get session by name: %w", err)
 	}
 
-	for _, session := range sessions {
-		if session.Name == name {
-			return session, nil
-		}
-	}
-
-	return nil, nil
+	return findBy(sessions, func(s *Session) bool { return s.Name == name }), nil
 }
 
 // Session is an alias for GetSessionByName.

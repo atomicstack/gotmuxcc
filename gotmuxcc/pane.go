@@ -162,12 +162,7 @@ func (s *Session) ListPanes() ([]*Pane, error) {
 		return nil, fmt.Errorf("failed to list panes: %w", err)
 	}
 
-	results := output.collect()
-	panes := make([]*Pane, 0, len(results))
-	for _, result := range results {
-		panes = append(panes, result.toPane(s.tmux))
-	}
-	return panes, nil
+	return collectAs(output, s.tmux, queryResult.toPane), nil
 }
 
 // GetPaneByIndex returns a pane within a window by index.
@@ -176,12 +171,7 @@ func (w *Window) GetPaneByIndex(idx int) (*Pane, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pane by index: %w", err)
 	}
-	for _, pane := range panes {
-		if pane.Index == idx {
-			return pane, nil
-		}
-	}
-	return nil, nil
+	return findBy(panes, func(p *Pane) bool { return p.Index == idx }), nil
 }
 
 // SendKeys sends keys to the pane.

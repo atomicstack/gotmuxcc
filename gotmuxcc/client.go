@@ -73,27 +73,16 @@ func (t *Tmux) ListClients() ([]*Client, error) {
 		return nil, fmt.Errorf("failed to list clients: %w", err)
 	}
 
-	results := output.collect()
-	clients := make([]*Client, 0, len(results))
-	for _, entry := range results {
-		clients = append(clients, entry.toClient(t))
-	}
-
-	return clients, nil
+	return collectAs(output, t, queryResult.toClient), nil
 }
 
 // GetClientByTty retrieves a client by tty identifier.
 func (t *Tmux) GetClientByTty(tty string) (*Client, error) {
 	clients, err := t.ListClients()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get client by tty: %w", err)
 	}
-	for _, client := range clients {
-		if client.Tty == tty {
-			return client, nil
-		}
-	}
-	return nil, nil
+	return findBy(clients, func(c *Client) bool { return c.Tty == tty }), nil
 }
 
 // GetSession retrieves the session this client is attached to.

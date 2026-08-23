@@ -138,6 +138,18 @@ func (o *queryOutput) collect() []queryResult {
 	return results
 }
 
+// collectAs converts every record in the output with conv. It is the shared
+// body of the List* methods, which would otherwise each repeat the same
+// collect/make/append loop once per entity type.
+func collectAs[T any](o *queryOutput, t *Tmux, conv func(queryResult, *Tmux) *T) []*T {
+	results := o.collect()
+	items := make([]*T, 0, len(results))
+	for _, result := range results {
+		items = append(items, conv(result, t))
+	}
+	return items
+}
+
 func (o *queryOutput) one() queryResult {
 	collected := o.collect()
 	if len(collected) == 0 {

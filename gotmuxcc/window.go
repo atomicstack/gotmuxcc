@@ -105,11 +105,7 @@ func (w *Window) ListPanes() ([]*Pane, error) {
 		return nil, fmt.Errorf("failed to list panes: %w", err)
 	}
 
-	panes := make([]*Pane, 0)
-	for _, result := range output.collect() {
-		panes = append(panes, result.toPane(w.tmux))
-	}
-	return panes, nil
+	return collectAs(output, w.tmux, queryResult.toPane), nil
 }
 
 // Kill terminates the window.
@@ -312,12 +308,7 @@ func (t *Tmux) listAllWindowsDirect() ([]*Window, error) {
 		return nil, fmt.Errorf("failed to list all windows: %w", err)
 	}
 
-	results := output.collect()
-	windows := make([]*Window, 0, len(results))
-	for _, result := range results {
-		windows = append(windows, result.toWindow(t))
-	}
-	return windows, nil
+	return collectAs(output, t, queryResult.toWindow), nil
 }
 
 // ListAllPanes lists all panes across sessions.
@@ -363,13 +354,7 @@ func (t *Tmux) listAllPanesDirect() ([]*Pane, error) {
 		return nil, fmt.Errorf("failed to list all panes: %w", err)
 	}
 
-	results := output.collect()
-	panes := make([]*Pane, 0, len(results))
-	for _, entry := range results {
-		panes = append(panes, entry.toPane(t))
-	}
-
-	return panes, nil
+	return collectAs(output, t, queryResult.toPane), nil
 }
 
 // GetWindowById retrieves a window by its ID.
@@ -379,13 +364,7 @@ func (t *Tmux) GetWindowById(id string) (*Window, error) {
 		return nil, fmt.Errorf("failed to get window by id: %w", err)
 	}
 
-	for _, window := range windows {
-		if window.Id == id {
-			return window, nil
-		}
-	}
-
-	return nil, nil
+	return findBy(windows, func(w *Window) bool { return w.Id == id }), nil
 }
 
 // GetPaneById retrieves a pane by its ID.
@@ -395,13 +374,7 @@ func (t *Tmux) GetPaneById(id string) (*Pane, error) {
 		return nil, fmt.Errorf("failed to get pane by id: %w", err)
 	}
 
-	for _, pane := range panes {
-		if pane.Id == id {
-			return pane, nil
-		}
-	}
-
-	return nil, nil
+	return findBy(panes, func(p *Pane) bool { return p.Id == id }), nil
 }
 
 // GetClient retrieves the first client in the server (compat helper).
@@ -460,12 +433,7 @@ func (s *Session) listWindowsWithTarget(target string) ([]*Window, error) {
 		return nil, fmt.Errorf("failed to list windows: %w", err)
 	}
 
-	results := output.collect()
-	windows := make([]*Window, 0, len(results))
-	for _, result := range results {
-		windows = append(windows, result.toWindow(s.tmux))
-	}
-	return windows, nil
+	return collectAs(output, s.tmux, queryResult.toWindow), nil
 }
 
 // GetWindowByName returns a window by its name within the session.
@@ -474,12 +442,7 @@ func (s *Session) GetWindowByName(name string) (*Window, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get window by name: %w", err)
 	}
-	for _, window := range windows {
-		if window.Name == name {
-			return window, nil
-		}
-	}
-	return nil, nil
+	return findBy(windows, func(w *Window) bool { return w.Name == name }), nil
 }
 
 // GetWindowByIndex returns a window by index within the session.
@@ -488,12 +451,7 @@ func (s *Session) GetWindowByIndex(idx int) (*Window, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get window by index: %w", err)
 	}
-	for _, window := range windows {
-		if window.Index == idx {
-			return window, nil
-		}
-	}
-	return nil, nil
+	return findBy(windows, func(w *Window) bool { return w.Index == idx }), nil
 }
 
 // NewWindowOptions customise new-window behaviour.
