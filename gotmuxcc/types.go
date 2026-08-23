@@ -102,19 +102,24 @@ type Window struct {
 	Linked             bool
 	LinkedSessions     int
 	LinkedSessionsList []string
-	MarkedFlag         bool
-	Name               string
-	Session            string
-	OffsetX            int
-	OffsetY            int
-	Panes              int
-	RawFlags           string
-	SilenceFlag        int
-	StackIndex         int
-	StartFlag          bool
-	VisibleLayout      string
-	Width              int
-	ZoomedFlag         bool
+	// ManualHeight and ManualWidth are the window's manually set size, if any.
+	ManualHeight int
+	ManualWidth  int
+	MarkedFlag   bool
+	// ModalPane is the id of the window's modal pane, if any.
+	ModalPane     string
+	Name          string
+	Session       string
+	OffsetX       int
+	OffsetY       int
+	Panes         int
+	RawFlags      string
+	SilenceFlag   int
+	StackIndex    int
+	StartFlag     bool
+	VisibleLayout string
+	Width         int
+	ZoomedFlag    bool
 
 	tmux *Tmux
 }
@@ -135,33 +140,51 @@ type Pane struct {
 	DeadStatus     int
 	DeadTime       string
 	Fg             string
-	Format         bool
-	Height         int
-	Id             string
-	InMode         bool
-	Index          int
-	InputOff       bool
-	Last           bool
-	Left           string
-	Marked         bool
-	MarkedSet      bool
-	Mode           string
-	Path           string
-	Pid            int32
-	Pipe           bool
-	Right          string
-	SearchString   string
-	SessionName    string
-	StartCommand   string
-	StartPath      string
-	Synchronized   bool
-	Tabs           string
-	Title          string
-	Top            string
-	Tty            string
-	UnseenChanges  bool
+	// Flags holds the pane flag characters (* - Z, plus F for floating and
+	// O for modal on tmux 3.8 and later).
+	Flags string
+	// FloatingFlag reports whether the pane is a floating pane. Floating panes
+	// are ordinary members of the window's pane list on tmux 3.8 and later, so
+	// this is the only thing that distinguishes them in list-panes output.
+	FloatingFlag bool
+	Format       bool
+	Height       int
+	Id           string
+	InMode       bool
+	Index        int
+	InputOff     bool
+	Last         bool
+	Left         string
+	Marked       bool
+	MarkedSet    bool
+	Mode         string
+	// ModalFlag reports whether the pane is the window's modal pane.
+	ModalFlag     bool
+	Path          string
+	Pid           int32
+	Pipe          bool
+	Right         string
+	SearchString  string
+	SessionName   string
+	StartCommand  string
+	StartPath     string
+	Synchronized  bool
+	Tabs          string
+	Title         string
+	Top           string
+	Tty           string
+	UnseenChanges bool
+	// UnzoomedHeight and UnzoomedWidth are the pane's size when it is not
+	// zoomed.
+	UnzoomedHeight int
+	UnzoomedWidth  int
 	Width          int
 	WindowIndex    int
+	// X and Y are the pane's position, and Z its z-index; floating panes stack
+	// above tiled ones.
+	X int
+	Y int
+	Z int
 
 	tmux *Tmux
 }

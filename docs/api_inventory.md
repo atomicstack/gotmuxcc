@@ -337,3 +337,23 @@ Fields:
 - Preserve struct field names and exported option shapes to avoid breaking downstream users.
 - Methods that expose variadic or pointer option parameters should maintain identical signatures.
 - Any behavioral differences introduced by the control-mode backend must keep method contracts consistent (errors, nil returns, etc.).
+
+## gotmuxcc additions beyond gotmux
+These fields have no gotmux equivalent; they are additive, so gotmux consumers are
+unaffected. They resolve to their zero values on tmux versions that do not know the
+underlying format variables.
+
+### Pane
+- `Flags string` (`pane_flags`)
+- `FloatingFlag bool` (`pane_floating_flag`)
+- `ModalFlag bool` (`pane_modal_flag`)
+- `UnzoomedHeight int` (`pane_unzoomed_height`)
+- `UnzoomedWidth int` (`pane_unzoomed_width`)
+- `X int` (`pane_x`)
+- `Y int` (`pane_y`)
+- `Z int` (`pane_z`)
+
+### Window
+- `ManualHeight int` (`window_manual_height`)
+- `ManualWidth int` (`window_manual_width`)
+- `ModalPane string` (`window_modal_pane`)

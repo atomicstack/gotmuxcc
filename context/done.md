@@ -205,3 +205,9 @@ Here’s what’s happened so far:
   carry exactly three decimal fields; `%exit` is only honoured at depth 0. A
   `%begin` whose flags field is not `1` is never paired with a queued request,
   since tmux sets that field only for commands the control client typed.
+- Added `pane_flags`, `pane_floating_flag`, `pane_modal_flag`, `pane_x`, `pane_y`,
+  `pane_z`, `pane_unzoomed_width`, `pane_unzoomed_height` to `paneVars()` and
+  `window_modal_pane`, `window_manual_width`, `window_manual_height` to
+  `windowVars()`, with matching `Pane`/`Window` fields. tmux 3.8 keeps floating
+  panes in the window's ordinary pane list, so without these they are
+  indistinguishable from tiled panes in `list-panes` output.
