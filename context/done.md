@@ -211,3 +211,13 @@ Here’s what’s happened so far:
   `windowVars()`, with matching `Pane`/`Window` fields. tmux 3.8 keeps floating
   panes in the window's ordinary pane list, so without these they are
   indistinguishable from tiled panes in `list-panes` output.
+- Collapsed two duplicated function families onto unexported generic helpers
+  (`collectAs` in `gotmuxcc/query.go`, `findBy` in `gotmuxcc/helpers.go`). Seven
+  list-and-convert methods repeated the same collect/make/append loop and seven
+  find-by-field lookups repeated the same loop/compare/return-nil-nil search;
+  the copies had already drifted (loop variable spelled `result`/`entry`/`item`,
+  and `GetClientByTty` alone returned its error unwrapped). Net -51 lines of
+  production code with no exported declaration added, removed or changed. Needs
+  generics (Go 1.18) but *not* Go 1.27 — the `go` directive stays at 1.22 so
+  consumers see no change in minimum version. Preceded by characterisation tests
+  for the six affected functions that had 0% coverage.
