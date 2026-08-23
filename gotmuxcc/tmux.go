@@ -3,6 +3,7 @@ package gotmuxcc
 import (
 	"context"
 	"errors"
+	"sync"
 )
 
 // controlTransport is the low-level interface used by Tmux to communicate with
@@ -120,10 +121,17 @@ func NewTmuxWithOptions(socketPath string, opts ...ConstructorOption) (*Tmux, er
 }
 
 // Tmux is the entry point to the library.
+//
+// Socket, transport and router are written once during construction and never
+// mutated afterwards, so a Tmux value is safe for concurrent use — including
+// calling Close while commands are still in flight.
 type Tmux struct {
 	Socket    *Socket
 	transport controlTransport
 	router    *router
+
+	closeOnce sync.Once
+	closeErr  error
 }
 
 // Close shuts down the underlying control-mode transport and kills the tmux -C
@@ -133,24 +141,26 @@ type Tmux struct {
 // Close (parent-death signal). macOS and the BSDs have no such mechanism, so on
 // those platforms calling Close — or binding the client to a cancelable context
 // via NewTmuxContext — is the only way to avoid orphaning the subprocess.
+// Close is safe to call concurrently with in-flight commands and safe to call
+// more than once; repeat calls return the same error as the first.
+//
+// Closing does not clear Socket, transport or router. Clearing them would race
+// with any command still running, and it is unnecessary: router.close fails
+// every pending and in-flight request via failAll, so subsequent commands
+// return errRouterClosed on their own.
 func (t *Tmux) Close() error {
 	if t == nil {
 		return nil
 	}
-	if t.router != nil {
-		err := t.router.close()
-		t.router = nil
-		t.transport = nil
-		t.Socket = nil
-		return err
-	}
-	if t.transport != nil {
-		err := t.transport.Close()
-		t.transport = nil
-		t.Socket = nil
-		return err
-	}
-	return nil
+	t.closeOnce.Do(func() {
+		switch {
+		case t.router != nil:
+			t.closeErr = t.router.close()
+		case t.transport != nil:
+			t.closeErr = t.transport.Close()
+		}
+	})
+	return t.closeErr
 }
 
 // events exposes the router's asynchronous event stream.
