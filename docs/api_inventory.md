@@ -353,6 +353,22 @@ underlying format variables.
 - `Y int` (`pane_y`)
 - `Z int` (`pane_z`)
 
+### Cancellation
+Context-aware variants of the command methods on the polling and preview paths.
+Existing signatures are unchanged and delegate through `context.Background()`.
+- `ListSessionsContext(ctx) ([]*Session, error)`
+- `ListAllWindowsContext(ctx) ([]*Window, error)`
+- `ListAllPanesContext(ctx) ([]*Pane, error)`
+- `CapturePaneContext(ctx, target, *CaptureOptions) (string, error)`
+- `ListSessionsFormatContext(ctx, format) ([]string, error)`
+- `ListWindowsFormatContext(ctx, target, filter, format) ([]string, error)`
+- `ListPanesFormatContext(ctx, target, filter, format) ([]string, error)`
+- `CommandContext(ctx, parts ...string) (string, error)`
+
+### Construction
+- `DefaultHandshakeTimeout` (10s) — bounds the initial control-mode handshake wait
+- `WithHandshakeTimeout(d) ConstructorOption` — override it; non-positive disables the bound
+
 ### Window
 - `ManualHeight int` (`window_manual_height`)
 - `ManualWidth int` (`window_manual_width`)

@@ -221,3 +221,25 @@ Here’s what’s happened so far:
   generics (Go 1.18) but *not* Go 1.27 — the `go` directive stays at 1.22 so
   consumers see no change in minimum version. Preceded by characterisation tests
   for the six affected functions that had 0% coverage.
+- Fixed a data race and a check-then-use nil deref in `Tmux.Close()`: it wrote
+  `router`/`transport`/`Socket` unsynchronised while `runCommand` read `router`.
+  Fixed by removing the mutation rather than locking — `router.close()` already
+  calls `failAll(errRouterClosed)`, so clearing the fields bought nothing. Close
+  is now idempotent via `sync.Once`. Reported by tmux-popup-control, whose
+  watcher deliberately closes a client out from under an abandoned fetch.
+- Fixed a `send on closed channel` panic in `internal/control`: `finish()` closed
+  `t.lines` while the stdout forwarder — the channel's only sender — could be
+  parked on a send. The forwarder now owns the close via `defer`; `finish()` no
+  longer touches it. The panic was unrecoverable, since it landed on a
+  library-owned goroutine.
+- Added per-command context support. `runCommand` is the single chokepoint, so
+  ctx threads through `router.runCommandContext` → `query.runContext` →
+  `Tmux.runCommandContext`. Eight exported `…Context` variants cover the
+  consumer's polling and preview paths, and ctx reaches every command in the
+  `ListAllWindows`/`ListAllPanes` fallback chains. Abandoning is caller-side
+  only: the request stays in the router's pending queue so response correlation
+  (each `%begin` pairs with `pending[0]`) cannot desynchronise.
+- Bounded the constructor's control-mode handshake wait with
+  `DefaultHandshakeTimeout` (10s) and `WithHandshakeTimeout` to override or
+  disable it. Previously a tmux that neither completed the handshake nor closed
+  the transport wedged `NewTmux`/`DefaultTmux` forever.
