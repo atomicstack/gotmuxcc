@@ -78,7 +78,12 @@ func discoverAttachTarget(tmuxBinary, socketPath string) (string, error) {
 	if strings.TrimSpace(socketPath) != "" {
 		args = append(args, "-S", socketPath)
 	}
-	args = append(args, "list-sessions", "-F", "#{session_name}")
+	// Ask for the session id, not the name. tmux relaxed name validation in
+	// 166267c8 ("Allow :. in names again"), so a name may contain ":" or "."
+	// — and attach-session parses those as the session:window.pane
+	// separators, making such a name unusable as a target ("can't find
+	// window: ..."). "$N" is unambiguous and cannot collide.
+	args = append(args, "list-sessions", "-F", "#{session_id}")
 	cmd := exec.Command(tmuxBinary, args...)
 	output, err := cmd.Output()
 	if err != nil {
