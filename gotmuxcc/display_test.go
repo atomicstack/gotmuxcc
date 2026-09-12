@@ -20,9 +20,9 @@ func TestDisplayMessage(t *testing.T) {
 		if !strings.Contains(cmd, "-p") {
 			t.Errorf("expected -p flag: %s", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
+		ft.lines <- "%begin 1 1 1"
 		ft.lines <- "myvalue"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	result, err := tmux.DisplayMessage("", "#{client_name}")
@@ -46,9 +46,9 @@ func TestDisplayMessageWithTarget(t *testing.T) {
 		if !strings.Contains(cmd, "-t %0") {
 			t.Errorf("expected target flag: %s", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
+		ft.lines <- "%begin 1 1 1"
 		ft.lines <- "session1"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	result, err := tmux.DisplayMessage("%0", "#{session_name}")
@@ -72,10 +72,10 @@ func TestListSessionsFormat(t *testing.T) {
 		if !strings.Contains(cmd, "list-sessions") || !strings.Contains(cmd, "-F") {
 			t.Errorf("unexpected command: %s", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
+		ft.lines <- "%begin 1 1 1"
 		ft.lines <- "session1\t2\t1"
 		ft.lines <- "session2\t3\t0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	lines, err := tmux.ListSessionsFormat("#{session_name}\t#{session_windows}\t#{session_attached}")
@@ -100,8 +100,8 @@ func TestListSessionsFormatQuotesWhitespace(t *testing.T) {
 		if !strings.Contains(cmd, "'#{session_name}\t#{session_windows}'") {
 			t.Errorf("format with whitespace should be quoted: %s", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	_, err := tmux.ListSessionsFormat("#{session_name}\t#{session_windows}")
@@ -123,9 +123,9 @@ func TestDisplayMessageQuotesFormat(t *testing.T) {
 		if !strings.Contains(cmd, "'#S: #{session_windows} windows'") {
 			t.Errorf("format with space should be quoted: %s", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
+		ft.lines <- "%begin 1 1 1"
 		ft.lines <- "main: 3 windows"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	_, err := tmux.DisplayMessage("", "#S: #{session_windows} windows")
@@ -147,8 +147,8 @@ func TestListWindowsFormatQuotesFilter(t *testing.T) {
 		if !strings.Contains(cmd, "-f '#{window_name} == bash'") {
 			t.Errorf("filter with spaces should be quoted: %s", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	_, err := tmux.ListWindowsFormat("", "#{window_name} == bash", "#{window_id}")
@@ -169,9 +169,9 @@ func TestListWindowsFormatAll(t *testing.T) {
 		if !strings.Contains(cmd, "list-windows") || !strings.Contains(cmd, "-a") {
 			t.Errorf("expected -a flag: %s", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
+		ft.lines <- "%begin 1 1 1"
 		ft.lines <- "@0\tdefault:0\tbash"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	lines, err := tmux.ListWindowsFormat("", "", "#{window_id}\t#{session_name}:#{window_index}\t#{window_name}")
@@ -198,9 +198,9 @@ func TestListWindowsFormatWithTarget(t *testing.T) {
 		if strings.Contains(cmd, "-a") {
 			t.Errorf("should not have -a with target: %s", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
+		ft.lines <- "%begin 1 1 1"
 		ft.lines <- "window1"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	lines, err := tmux.ListWindowsFormat("mysession", "", "#{window_name}")
@@ -224,8 +224,8 @@ func TestListWindowsFormatWithFilter(t *testing.T) {
 		if !strings.Contains(cmd, "-f") {
 			t.Errorf("expected -f flag: %s", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	_, err := tmux.ListWindowsFormat("", "#{window_name}==bash", "#{window_id}")
@@ -246,9 +246,9 @@ func TestListPanesFormatAll(t *testing.T) {
 		if !strings.Contains(cmd, "list-panes") || !strings.Contains(cmd, "-a") {
 			t.Errorf("expected list-panes -a: %s", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
+		ft.lines <- "%begin 1 1 1"
 		ft.lines <- "pane0\tdefault:0.0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	lines, err := tmux.ListPanesFormat("", "", "#{pane_index}\t#S:#{window_index}.#{pane_index}")

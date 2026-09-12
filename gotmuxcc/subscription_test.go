@@ -22,8 +22,8 @@ func TestSubscribeBuildCommand(t *testing.T) {
 		if !strings.Contains(arg, "mytest") || !strings.Contains(arg, "window_name") {
 			t.Errorf("unexpected argument: %s", arg)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.Subscribe("mytest", SubWindow("@0"), "#{window_name}")
@@ -45,8 +45,8 @@ func TestSubscribeSessionTarget(t *testing.T) {
 		if !strings.Contains(cmd, "mytest::") {
 			t.Errorf("expected session target (empty), got: %s", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.Subscribe("mytest", SubSession, "#{session_name}")
@@ -67,8 +67,8 @@ func TestSubscribeAllPanes(t *testing.T) {
 		if !strings.Contains(cmd, "mytest:%*:") {
 			t.Errorf("expected all-panes target, got: %s", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.Subscribe("mytest", SubAllPanes, "#{pane_title}")
@@ -91,8 +91,8 @@ func TestUnsubscribe(t *testing.T) {
 		if cmd != expected {
 			t.Errorf("expected %q, got %q", expected, cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.Unsubscribe("mytest")
@@ -113,8 +113,8 @@ func TestSubscribePaneTarget(t *testing.T) {
 		if !strings.Contains(cmd, "title:%5:") {
 			t.Errorf("expected pane target %%5, got: %s", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.Subscribe("title", SubPane("%5"), "#{pane_title}")

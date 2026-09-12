@@ -10,7 +10,7 @@ func TestQueryRunSuccess(t *testing.T) {
 
 	go func() {
 		<-tr.sendC
-		tr.respond("%begin 1 1 0", "'one-:-two'", "%end 1 1 0")
+		tr.respond("%begin 1 1 1", "'one-:-two'", "%end 1 1 1")
 	}()
 
 	q := newQuery(tmux).cmd("list-panes").vars("first", "second")
@@ -42,7 +42,7 @@ func TestQueryRunError(t *testing.T) {
 
 	go func() {
 		<-tr.sendC
-		tr.respond("%begin 1 1 0", "failure", "%error 1 1 0")
+		tr.respond("%begin 1 1 1", "failure", "%error 1 1 1")
 	}()
 
 	q := newQuery(tmux).cmd("list-panes")

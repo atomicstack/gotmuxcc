@@ -11,8 +11,8 @@ func newAutoTransport() *simpleTransport {
 	tr := newSimpleTransport()
 	go func() {
 		for range tr.sendC {
-			tr.lines <- "%begin 1 1 0"
-			tr.lines <- "%end 1 1 0"
+			tr.lines <- "%begin 1 1 1"
+			tr.lines <- "%end 1 1 1"
 		}
 	}()
 	return tr
@@ -192,18 +192,18 @@ func TestListAllWindowsFallback(t *testing.T) {
 	}()
 
 	responses := []scriptedResponse{
-		{match: "list-windows -a", lines: []string{"%begin 1 1 0", "aggregate unavailable", "%error 1 1 0"}},
+		{match: "list-windows -a", lines: []string{"%begin 1 1 1", "aggregate unavailable", "%error 1 1 1"}},
 		{match: "list-sessions", lines: []string{
-			"%begin 1 1 0",
+			"%begin 1 1 1",
 			formatRecord(sessionVars, map[string]string{
 				varSessionName:    "popup",
 				varSessionId:      "$1",
 				varSessionWindows: "1",
 			}),
-			"%end 1 1 0",
+			"%end 1 1 1",
 		}},
 		{match: "list-windows -t ", lines: []string{
-			"%begin 1 1 0",
+			"%begin 1 1 1",
 			formatRecord(windowVars, map[string]string{
 				varWindowId:     "@1",
 				varWindowName:   "popup",
@@ -212,7 +212,7 @@ func TestListAllWindowsFallback(t *testing.T) {
 				varWindowPanes:  "1",
 				varWindowActive: "1",
 			}),
-			"%end 1 1 0",
+			"%end 1 1 1",
 		}},
 	}
 
@@ -261,19 +261,19 @@ func TestListAllPanesFallback(t *testing.T) {
 	}()
 
 	responses := []scriptedResponse{
-		{match: "list-panes -a", lines: []string{"%begin 1 1 0", "aggregate unavailable", "%error 1 1 0"}},
-		{match: "list-windows -a", lines: []string{"%begin 1 1 0", "aggregate unavailable", "%error 1 1 0"}},
+		{match: "list-panes -a", lines: []string{"%begin 1 1 1", "aggregate unavailable", "%error 1 1 1"}},
+		{match: "list-windows -a", lines: []string{"%begin 1 1 1", "aggregate unavailable", "%error 1 1 1"}},
 		{match: "list-sessions", lines: []string{
-			"%begin 1 1 0",
+			"%begin 1 1 1",
 			formatRecord(sessionVars, map[string]string{
 				varSessionName:    "popup",
 				varSessionId:      "$1",
 				varSessionWindows: "1",
 			}),
-			"%end 1 1 0",
+			"%end 1 1 1",
 		}},
 		{match: "list-windows -t ", lines: []string{
-			"%begin 1 1 0",
+			"%begin 1 1 1",
 			formatRecord(windowVars, map[string]string{
 				varWindowId:    "@1",
 				varWindowName:  "popup",
@@ -281,10 +281,10 @@ func TestListAllPanesFallback(t *testing.T) {
 				varWindowIndex: "0",
 				varWindowPanes: "1",
 			}),
-			"%end 1 1 0",
+			"%end 1 1 1",
 		}},
 		{match: "list-panes -t @1", lines: []string{
-			"%begin 1 1 0",
+			"%begin 1 1 1",
 			formatRecord(paneVars, map[string]string{
 				varPaneId:             "%1",
 				varPaneIndex:          "0",
@@ -293,7 +293,7 @@ func TestListAllPanesFallback(t *testing.T) {
 				varPaneWidth:          "120",
 				varPaneHeight:         "30",
 			}),
-			"%end 1 1 0",
+			"%end 1 1 1",
 		}},
 	}
 

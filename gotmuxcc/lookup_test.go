@@ -24,11 +24,11 @@ func scriptedTmux(t *testing.T, responses []scriptedResponse) *Tmux {
 
 func clientListResponse(records ...map[string]string) scriptedResponse {
 	vars := varsFor(func(q *query) *query { return q.clientVars() })
-	lines := []string{"%begin 1 1 0"}
+	lines := []string{"%begin 1 1 1"}
 	for _, rec := range records {
 		lines = append(lines, formatRecord(vars, rec))
 	}
-	return scriptedResponse{match: "list-clients", lines: append(lines, "%end 1 1 0")}
+	return scriptedResponse{match: "list-clients", lines: append(lines, "%end 1 1 1")}
 }
 
 func TestListClientsParsesEveryRecord(t *testing.T) {
@@ -105,11 +105,11 @@ func TestSessionListClientsFiltersBySessionName(t *testing.T) {
 
 func windowListResponse(records ...map[string]string) scriptedResponse {
 	vars := varsFor(func(q *query) *query { return q.windowVars() })
-	lines := []string{"%begin 1 1 0"}
+	lines := []string{"%begin 1 1 1"}
 	for _, rec := range records {
 		lines = append(lines, formatRecord(vars, rec))
 	}
-	return scriptedResponse{match: "list-windows", lines: append(lines, "%end 1 1 0")}
+	return scriptedResponse{match: "list-windows", lines: append(lines, "%end 1 1 1")}
 }
 
 func TestGetWindowByNameReturnsMatch(t *testing.T) {
@@ -176,11 +176,11 @@ func TestGetWindowByIndexMissingReturnsNilNil(t *testing.T) {
 
 func paneListResponse(records ...map[string]string) scriptedResponse {
 	vars := varsFor(func(q *query) *query { return q.paneVars() })
-	lines := []string{"%begin 1 1 0"}
+	lines := []string{"%begin 1 1 1"}
 	for _, rec := range records {
 		lines = append(lines, formatRecord(vars, rec))
 	}
-	return scriptedResponse{match: "list-panes", lines: append(lines, "%end 1 1 0")}
+	return scriptedResponse{match: "list-panes", lines: append(lines, "%end 1 1 1")}
 }
 
 func TestGetPaneByIndexReturnsMatch(t *testing.T) {
@@ -219,7 +219,7 @@ func TestGetPaneByIndexMissingReturnsNilNil(t *testing.T) {
 func TestGetPaneByIndexPropagatesError(t *testing.T) {
 	tmux := scriptedTmux(t, []scriptedResponse{{
 		match: "list-panes",
-		lines: []string{"%begin 1 1 0", "no such window: @1", "%error 1 1 0"},
+		lines: []string{"%begin 1 1 1", "no such window: @1", "%error 1 1 1"},
 	}})
 	window := &Window{Id: "@1", tmux: tmux}
 

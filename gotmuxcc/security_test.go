@@ -119,8 +119,8 @@ func TestSubscribeRejectsColonInName(t *testing.T) {
 	go func() {
 		cmd, ok := <-ft.sendC
 		if ok && cmd != "" {
-			ft.lines <- "%begin 1 1 0"
-			ft.lines <- "%end 1 1 0"
+			ft.lines <- "%begin 1 1 1"
+			ft.lines <- "%end 1 1 1"
 		}
 	}()
 
@@ -145,8 +145,8 @@ func TestSetWindowSizeQuotesWindowID(t *testing.T) {
 		if strings.Contains(cmd, "\n") {
 			t.Errorf("command must not contain newlines: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	// normal usage should still work

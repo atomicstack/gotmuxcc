@@ -28,6 +28,17 @@ var (
 // guards of commands typed by this control client.
 const controlGuardFlags = "1"
 
+// Sentinel command labels for guard blocks that belong to no queued request.
+const (
+	// initialCommandLabel marks the implicit block tmux emits for the
+	// attach-session or new-session on its own command line.
+	initialCommandLabel = "(initial)"
+	// unsolicitedCommandLabel marks a block tmux emitted for a command this
+	// client did not type — in practice a hook, which tmux runs by inserting
+	// it into this client's own command queue.
+	unsolicitedCommandLabel = "(unsolicited)"
+)
+
 // Event represents an asynchronous notification emitted by tmux control mode.
 type Event struct {
 	Name   string   // event name without leading '%'
@@ -307,25 +318,42 @@ func (r *router) handleBegin(line string) {
 	}
 
 	// tmux sets the guard flags field from
-	// !!(state->flags & CMDQ_STATE_CONTROL) (cmd-queue.c), so it is 1 only for
-	// commands this control client typed. The implicit block for the
-	// attach-session/new-session on tmux's own command line carries 0 and must
-	// never be paired with a queued request.
+	// !!(state->flags & CMDQ_STATE_CONTROL) (cmd-queue.c), and
+	// CMDQ_STATE_CONTROL is set in exactly one place: for commands this
+	// control client typed on its own stdin (control.c, control_read_callback).
+	// Every other block carries 0 — the implicit one for the
+	// attach-session/new-session on tmux's own command line, and every command
+	// a hook runs, which tmux inserts into this client's queue and guards like
+	// any other. None of them may be paired with a queued request: doing so
+	// hands that request the hook's output and leaves every later reply off by
+	// one. Track them instead, so the body and closing guard are consumed as
+	// that block's own output rather than surfacing as orphan noise.
 	awaitingInitial := r.initialCmd && !r.initialDone
-	if len(r.pending) == 0 || (flags != controlGuardFlags && awaitingInitial) {
-		// If we're still waiting for the initial command response,
-		// track it so its output and %end are consumed cleanly.
-		if awaitingInitial {
-			trace.Printf("router", "begin <- #%s (initial command)", number)
-			r.inflight[number] = &commandState{
-				request: newCommandRequest("(initial)"),
-				time:    timeStr,
-				number:  number,
-				flags:   flags,
-			}
-			r.stack = append(r.stack, number)
-			return
+	if awaitingInitial && (flags != controlGuardFlags || len(r.pending) == 0) {
+		trace.Printf("router", "begin <- #%s (initial command)", number)
+		r.inflight[number] = &commandState{
+			request: newCommandRequest(initialCommandLabel),
+			time:    timeStr,
+			number:  number,
+			flags:   flags,
 		}
+		r.stack = append(r.stack, number)
+		return
+	}
+
+	if flags != controlGuardFlags {
+		trace.Printf("router", "begin <- #%s (unsolicited, flags=%s)", number, flags)
+		r.inflight[number] = &commandState{
+			request: newCommandRequest(unsolicitedCommandLabel),
+			time:    timeStr,
+			number:  number,
+			flags:   flags,
+		}
+		r.stack = append(r.stack, number)
+		return
+	}
+
+	if len(r.pending) == 0 {
 		r.emitEventLocked(eventForError("unexpected-begin", line, errUnexpectedBegin))
 		return
 	}
@@ -446,6 +474,7 @@ func (r *router) appendOutput(line string) {
 func (r *router) finishCommand(number, timeStr, flags string, cmdErr error, detail string) {
 	var state *commandState
 	var isInitial bool
+	var isUnsolicited bool
 
 	r.mu.Lock()
 	if r.err != nil {
@@ -457,9 +486,12 @@ func (r *router) finishCommand(number, timeStr, flags string, cmdErr error, deta
 	if state != nil {
 		delete(r.inflight, number)
 		r.removeFromStack(number)
-		if state.request.command == "(initial)" {
+		switch state.request.command {
+		case initialCommandLabel:
 			isInitial = true
 			r.initialDone = true
+		case unsolicitedCommandLabel:
+			isUnsolicited = true
 		}
 	}
 	pendingCount := len(r.pending)
@@ -469,6 +501,13 @@ func (r *router) finishCommand(number, timeStr, flags string, cmdErr error, deta
 	if isInitial {
 		trace.Printf("router", "initial command settled #%s", number)
 		r.readyOnce.Do(func() { close(r.ready) })
+		return
+	}
+
+	if isUnsolicited {
+		// Nothing is waiting on this block. Its output belonged to a command
+		// this client never typed, so it is dropped rather than delivered.
+		trace.Printf("router", "unsolicited command settled #%s lines=%d", number, len(state.output))
 		return
 	}
 

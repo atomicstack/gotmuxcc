@@ -50,9 +50,9 @@ func TestSessionListAndGet(t *testing.T) {
 
 	go func() {
 		for range tr.sendC {
-			tr.lines <- "%begin 1 1 0"
+			tr.lines <- "%begin 1 1 1"
 			tr.lines <- "'sess-1-:-alert-:-1-:-sess-1-:-created-:-1-:-group-:-2-:-sess-1-:-/tmp-:-stack-:-3'"
-			tr.lines <- "%end 1 1 0"
+			tr.lines <- "%end 1 1 1"
 		}
 	}()
 
@@ -77,8 +77,8 @@ func TestSessionLifecycleCommands(t *testing.T) {
 
 	go func() {
 		for range tr.sendC {
-			tr.lines <- "%begin 1 1 0"
-			tr.lines <- "%end 1 1 0"
+			tr.lines <- "%begin 1 1 1"
+			tr.lines <- "%end 1 1 1"
 		}
 	}()
 
@@ -118,8 +118,8 @@ func TestSessionAttachDetachHelpers(t *testing.T) {
 
 	go func() {
 		for range tr.sendC {
-			tr.lines <- "%begin 1 1 0"
-			tr.lines <- "%end 1 1 0"
+			tr.lines <- "%begin 1 1 1"
+			tr.lines <- "%end 1 1 1"
 		}
 	}()
 
@@ -167,8 +167,8 @@ func TestSessionHelpersFallbackToNameWhenIdMissing(t *testing.T) {
 
 	go func() {
 		for range tr.sendC {
-			tr.lines <- "%begin 1 1 0"
-			tr.lines <- "%end 1 1 0"
+			tr.lines <- "%begin 1 1 1"
+			tr.lines <- "%end 1 1 1"
 		}
 	}()
 
@@ -206,14 +206,14 @@ func TestSessionOptionHelpersUseSessionIdTarget(t *testing.T) {
 
 	go func() {
 		for cmd := range tr.sendC {
-			tr.lines <- "%begin 1 1 0"
+			tr.lines <- "%begin 1 1 1"
 			if strings.Contains(cmd, "show-option") && strings.Contains(cmd, "-v") {
 				tr.lines <- "value"
 			}
 			if strings.Contains(cmd, "show-options") {
 				tr.lines <- "@foo bar"
 			}
-			tr.lines <- "%end 1 1 0"
+			tr.lines <- "%end 1 1 1"
 		}
 	}()
 
@@ -253,9 +253,9 @@ func TestNewSessionQuotesShellCommand(t *testing.T) {
 
 	go func() {
 		for range tr.sendC {
-			tr.lines <- "%begin 1 1 0"
+			tr.lines <- "%begin 1 1 1"
 			tr.lines <- "'sess-1-:-alert-:-1-:-sess-1-:-created-:-1-:-group-:-2-:-sess-1-:-/tmp-:-stack-:-3'"
-			tr.lines <- "%end 1 1 0"
+			tr.lines <- "%end 1 1 1"
 		}
 	}()
 

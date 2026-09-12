@@ -18,8 +18,8 @@ func TestSetClientSize(t *testing.T) {
 		if cmd != expected {
 			t.Errorf("expected %q, got %q", expected, cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.SetClientSize(120, 40)
@@ -41,8 +41,8 @@ func TestSetWindowSize(t *testing.T) {
 		if cmd != expected {
 			t.Errorf("expected %q, got %q", expected, cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.SetWindowSize("@0", 80, 24)
@@ -64,8 +64,8 @@ func TestSetWindowSizeQuotesInjection(t *testing.T) {
 		if cmd != expected {
 			t.Errorf("expected %q, got %q", expected, cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.SetWindowSize("@0; kill-server", 80, 24)
@@ -87,8 +87,8 @@ func TestClearWindowSize(t *testing.T) {
 		if cmd != expected {
 			t.Errorf("expected %q, got %q", expected, cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.ClearWindowSize("@1")
@@ -114,8 +114,8 @@ func TestSetControlFlags(t *testing.T) {
 		if !strings.Contains(cmd, "pause-after=1000,no-output") {
 			t.Errorf("expected flags in command: %s", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.SetControlFlags("pause-after=1000,no-output")
@@ -136,8 +136,8 @@ func TestEnablePauseAfter(t *testing.T) {
 		if !strings.Contains(cmd, "pause-after=300") {
 			t.Errorf("expected pause-after=300: %s", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.EnablePauseAfter(300)
@@ -158,8 +158,8 @@ func TestDisablePauseAfter(t *testing.T) {
 		if !strings.Contains(cmd, "!pause-after") {
 			t.Errorf("expected !pause-after: %s", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.DisablePauseAfter()
@@ -181,8 +181,8 @@ func TestSetPaneOutput(t *testing.T) {
 		if cmd != expected {
 			t.Errorf("expected %q, got %q", expected, cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.SetPaneOutput("%0", "on")
@@ -203,8 +203,8 @@ func TestEnablePaneOutput(t *testing.T) {
 		if cmd != "refresh-client -A '%1:on'" {
 			t.Errorf("unexpected command: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.EnablePaneOutput("%1")
@@ -225,8 +225,8 @@ func TestDisablePaneOutput(t *testing.T) {
 		if cmd != "refresh-client -A '%2:off'" {
 			t.Errorf("unexpected command: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.DisablePaneOutput("%2")
@@ -247,8 +247,8 @@ func TestPausePaneOutput(t *testing.T) {
 		if cmd != "refresh-client -A '%0:pause'" {
 			t.Errorf("unexpected command: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.PausePaneOutput("%0")
@@ -269,8 +269,8 @@ func TestContinuePaneOutput(t *testing.T) {
 		if cmd != "refresh-client -A '%0:continue'" {
 			t.Errorf("unexpected command: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.ContinuePaneOutput("%0")
@@ -293,8 +293,8 @@ func TestSetMultiplePaneOutputs(t *testing.T) {
 		if !strings.Contains(cmd, "-A '%0:on'") || !strings.Contains(cmd, "-A '%1:off'") {
 			t.Errorf("expected multiple -A flags: %s", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.SetMultiplePaneOutputs([]string{"%0:on", "%1:off"})
@@ -335,8 +335,8 @@ func TestReportPaneColors(t *testing.T) {
 		if !strings.Contains(cmd, "%0:") {
 			t.Errorf("expected pane ID in command: %s", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.ReportPaneColors("%0", "rgb:ff/00/00")
@@ -360,8 +360,8 @@ func TestReportPaneColorsSimple(t *testing.T) {
 		if cmd != expected {
 			t.Errorf("expected %q, got %q", expected, cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.ReportPaneColors("%5", "STD1234567")

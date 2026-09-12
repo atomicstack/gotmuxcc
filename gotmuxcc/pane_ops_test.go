@@ -22,8 +22,8 @@ func TestPaneRename(t *testing.T) {
 		if !strings.Contains(cmd, "select-pane") || !strings.Contains(cmd, "-T") || !strings.Contains(cmd, "newtitle") {
 			t.Errorf("unexpected command: %s", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := pane.Rename("newtitle")
@@ -44,8 +44,8 @@ func TestPaneSwap(t *testing.T) {
 		if cmd != "swap-pane -s %0 -t %1" {
 			t.Errorf("unexpected command: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := pane.Swap("%1")
@@ -66,8 +66,8 @@ func TestPaneMove(t *testing.T) {
 		if cmd != "move-pane -s %0 -t @1" {
 			t.Errorf("unexpected command: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := pane.Move("@1")
@@ -88,8 +88,8 @@ func TestPaneMoveNoTarget(t *testing.T) {
 		if cmd != "move-pane -s %0" {
 			t.Errorf("unexpected command: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := pane.Move("")
@@ -110,8 +110,8 @@ func TestPaneBreak(t *testing.T) {
 		if cmd != "break-pane -s %0 -t mysess:1" {
 			t.Errorf("unexpected command: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := pane.Break("mysess:1")
@@ -132,8 +132,8 @@ func TestPaneJoin(t *testing.T) {
 		if cmd != "join-pane -s %0 -t @2" {
 			t.Errorf("unexpected command: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := pane.Join("@2")
@@ -154,8 +154,8 @@ func TestPaneResize(t *testing.T) {
 		if cmd != "resize-pane -t %0 -L 5" {
 			t.Errorf("unexpected command: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := pane.Resize(ResizeLeft, 5)
@@ -176,9 +176,9 @@ func TestCaptureOptionsStartEndLine(t *testing.T) {
 		if !strings.Contains(cmd, "-S -40") || !strings.Contains(cmd, "-E -1") {
 			t.Errorf("expected -S and -E flags: %s", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
+		ft.lines <- "%begin 1 1 1"
 		ft.lines <- "line1"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	_, err := tmux.CapturePane("%0", &CaptureOptions{
@@ -203,8 +203,8 @@ func TestTmuxRenamePane(t *testing.T) {
 		if !strings.Contains(cmd, "select-pane") || !strings.Contains(cmd, "-t %5") || !strings.Contains(cmd, "-T mytitle") {
 			t.Errorf("unexpected command: %s", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.RenamePane("%5", "mytitle")
@@ -225,8 +225,8 @@ func TestTmuxSwapPanes(t *testing.T) {
 		if cmd != "swap-pane -s %0 -t %1" {
 			t.Errorf("unexpected command: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.SwapPanes("%0", "%1")
@@ -247,8 +247,8 @@ func TestTmuxResizePane(t *testing.T) {
 		if cmd != "resize-pane -t %0 -D 10" {
 			t.Errorf("unexpected command: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.ResizePane("%0", ResizeDown, 10)
@@ -272,8 +272,8 @@ func TestPaneSplitWindowDetached(t *testing.T) {
 		if !strings.Contains(cmd, "-t %0") {
 			t.Errorf("expected -t %%0, got: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := pane.SplitWindow(&SplitWindowOptions{Detached: true})
@@ -295,8 +295,8 @@ func TestSessionListPanesUsesSessionId(t *testing.T) {
 		if !strings.Contains(cmd, "list-panes -s -t $1") {
 			t.Errorf("expected list-panes to use session id, got %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	if _, err := session.ListPanes(); err != nil {
@@ -325,8 +325,8 @@ func TestTmuxSplitWindow(t *testing.T) {
 		if !strings.Contains(cmd, "-h") {
 			t.Errorf("expected -h flag, got: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.SplitWindow("mysess:2", &SplitWindowOptions{
@@ -353,8 +353,8 @@ func TestTmuxSplitWindowWithCommand(t *testing.T) {
 		if !strings.Contains(cmd, "'cat /tmp/pane.txt; exec bash'") {
 			t.Errorf("expected shell command, got: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.SplitWindow("mysess:2", &SplitWindowOptions{
@@ -378,8 +378,8 @@ func TestTmuxSplitWindowQuotesShellCommand(t *testing.T) {
 		if cmd != expected {
 			t.Errorf("expected %q, got %q", expected, cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.SplitWindow("mysess:2", &SplitWindowOptions{
@@ -403,8 +403,8 @@ func TestPaneSendKeysQuotesLine(t *testing.T) {
 		if cmd != expected {
 			t.Errorf("expected %q, got %q", expected, cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := pane.SendKeys("printf 'hi'; kill-session")
@@ -425,8 +425,8 @@ func TestTmuxSplitWindowNilOpts(t *testing.T) {
 		if cmd != "split-window -t mysess:2" {
 			t.Errorf("unexpected command: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.SplitWindow("mysess:2", nil)

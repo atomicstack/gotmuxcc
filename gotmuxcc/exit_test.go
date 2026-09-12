@@ -84,9 +84,9 @@ func TestHandleExitInsideBlockIsCommandOutput(t *testing.T) {
 
 	go func() {
 		<-ft.sendC
-		ft.lines <- "%begin 1 1 0"
+		ft.lines <- "%begin 1 1 1"
 		ft.lines <- "%exit detached"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	result, err := r.runCommand("capture-pane -p -t %1")

@@ -154,7 +154,7 @@ func TestRouterEndInsideBlockRequiresExactTriple(t *testing.T) {
 	go func() {
 		<-ft.sendC
 		ft.lines <- "%begin 100 7 1"
-		ft.lines <- "%end 200 7 0"
+		ft.lines <- "%end 200 7 1"
 		ft.lines <- "tail"
 		ft.lines <- "%end 100 7 1"
 	}()
@@ -163,7 +163,7 @@ func TestRouterEndInsideBlockRequiresExactTriple(t *testing.T) {
 	if err != nil {
 		t.Fatalf("runCommand returned error: %v", err)
 	}
-	assertLines(t, result.Lines, []string{"%end 200 7 0", "tail"})
+	assertLines(t, result.Lines, []string{"%end 200 7 1", "tail"})
 }
 
 // TestRouterErrorInsideBlockRequiresExactTriple asserts the same for %error:
@@ -176,7 +176,7 @@ func TestRouterErrorInsideBlockRequiresExactTriple(t *testing.T) {
 	go func() {
 		<-ft.sendC
 		ft.lines <- "%begin 100 8 1"
-		ft.lines <- "%error 200 8 0"
+		ft.lines <- "%error 200 8 1"
 		ft.lines <- "tail"
 		ft.lines <- "%end 100 8 1"
 	}()
@@ -185,7 +185,7 @@ func TestRouterErrorInsideBlockRequiresExactTriple(t *testing.T) {
 	if err != nil {
 		t.Fatalf("runCommand returned error: %v", err)
 	}
-	assertLines(t, result.Lines, []string{"%error 200 8 0", "tail"})
+	assertLines(t, result.Lines, []string{"%error 200 8 1", "tail"})
 }
 
 // TestRouterGuardPrefixesAreNotSubstringMatched asserts notifications whose
@@ -285,7 +285,7 @@ func TestRouterGuardWithTrailingFieldIsRejected(t *testing.T) {
 	r := newRouterWithInit(ft, false)
 	defer r.close()
 
-	ft.lines <- "%end 100 1 0 extra"
+	ft.lines <- "%end 100 1 1 extra"
 
 	select {
 	case evt := <-r.eventsChannel():

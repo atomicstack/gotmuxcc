@@ -69,7 +69,7 @@ func TestSetOptionCommand(t *testing.T) {
 
 	go func() {
 		for range rt.sendC {
-			rt.respond("%begin 1 1 0", "%end 1 1 0")
+			rt.respond("%begin 1 1 1", "%end 1 1 1")
 		}
 	}()
 
@@ -94,7 +94,7 @@ func TestSetOptionQuotesPositionalArgs(t *testing.T) {
 
 	go func() {
 		for range rt.sendC {
-			rt.respond("%begin 1 1 0", "%end 1 1 0")
+			rt.respond("%begin 1 1 1", "%end 1 1 1")
 		}
 	}()
 
@@ -121,7 +121,7 @@ func TestDeleteOptionCommand(t *testing.T) {
 
 	go func() {
 		for range rt.sendC {
-			rt.respond("%begin 1 1 0", "%end 1 1 0")
+			rt.respond("%begin 1 1 1", "%end 1 1 1")
 		}
 	}()
 
@@ -149,7 +149,7 @@ func TestDeleteOptionErrorPropagation(t *testing.T) {
 	go func() {
 		for cmd := range rt.sendC {
 			_ = cmd
-			rt.respond("%begin 1 1 0", "failure", "%error 1 1 0")
+			rt.respond("%begin 1 1 1", "failure", "%error 1 1 1")
 		}
 	}()
 
@@ -167,7 +167,7 @@ func TestOptionRetrieval(t *testing.T) {
 	go func() {
 		for cmd := range rt.sendC {
 			if strings.Contains(cmd, "show-option") {
-				rt.respond("%begin 1 1 0", "value", "%end 1 1 0")
+				rt.respond("%begin 1 1 1", "value", "%end 1 1 1")
 			}
 		}
 	}()
@@ -189,7 +189,7 @@ func TestOptionErrorPropagation(t *testing.T) {
 
 	go func() {
 		for range rt.sendC {
-			rt.respond("%begin 1 1 0", "missing", "%error 1 1 0")
+			rt.respond("%begin 1 1 1", "missing", "%error 1 1 1")
 		}
 	}()
 
@@ -206,10 +206,10 @@ func TestOptionsRetrieval(t *testing.T) {
 
 	go func() {
 		for range rt.sendC {
-			rt.respond("%begin 1 1 0",
+			rt.respond("%begin 1 1 1",
 				"@foo value",
 				"@bar other",
-				"%end 1 1 0")
+				"%end 1 1 1")
 		}
 	}()
 
@@ -236,7 +236,7 @@ func TestCommandMultiLineOutput(t *testing.T) {
 
 	go func() {
 		for range rt.sendC {
-			rt.respond("%begin 1 1 0", "line1", "line2", "%end 1 1 0")
+			rt.respond("%begin 1 1 1", "line1", "line2", "%end 1 1 1")
 		}
 	}()
 
@@ -257,7 +257,7 @@ func TestCommandErrorPropagation(t *testing.T) {
 
 	go func() {
 		for range rt.sendC {
-			rt.respond("%begin 1 1 0", "bad", "%error 1 1 0")
+			rt.respond("%begin 1 1 1", "bad", "%error 1 1 1")
 		}
 	}()
 
@@ -286,7 +286,7 @@ func TestGlobalOptionReturnsValue(t *testing.T) {
 		if !strings.Contains(cmd, "-v") {
 			t.Errorf("expected -v flag, got: %q", cmd)
 		}
-		rt.respond("%begin 1 1 0", "/home/user/.local/share/tmux", "%end 1 1 0")
+		rt.respond("%begin 1 1 1", "/home/user/.local/share/tmux", "%end 1 1 1")
 	}()
 
 	val, err := tmux.GlobalOption("@storage-dir")
@@ -306,7 +306,7 @@ func TestGlobalOptionReturnsEmptyForUnset(t *testing.T) {
 
 	go func() {
 		<-rt.sendC
-		rt.respond("%begin 1 1 0", "%end 1 1 0")
+		rt.respond("%begin 1 1 1", "%end 1 1 1")
 	}()
 
 	val, err := tmux.GlobalOption("@nonexistent")

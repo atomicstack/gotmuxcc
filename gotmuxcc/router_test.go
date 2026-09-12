@@ -64,9 +64,9 @@ func TestRouterRunCommandSuccess(t *testing.T) {
 
 	go func() {
 		<-ft.sendC
-		ft.lines <- "%begin 1712000000 1 0"
+		ft.lines <- "%begin 1712000000 1 1"
 		ft.lines <- "value"
-		ft.lines <- "%end 1712000000 1 0"
+		ft.lines <- "%end 1712000000 1 1"
 	}()
 
 	result, err := r.runCommand("display-message")
@@ -85,9 +85,9 @@ func TestRouterRunCommandError(t *testing.T) {
 
 	go func() {
 		<-ft.sendC
-		ft.lines <- "%begin 1712000000 2 0"
+		ft.lines <- "%begin 1712000000 2 1"
 		ft.lines <- "no such session: foo"
-		ft.lines <- "%error 1712000000 2 0"
+		ft.lines <- "%error 1712000000 2 1"
 	}()
 
 	_, err := r.runCommand("list-panes")
@@ -111,9 +111,9 @@ func TestRouterEmitsEvents(t *testing.T) {
 	go func() {
 		<-ft.sendC
 		ft.lines <- "%window-layout-changed @1"
-		ft.lines <- "%begin 1 3 0"
+		ft.lines <- "%begin 1 3 1"
 		ft.lines <- "ok"
-		ft.lines <- "%end 1 3 0"
+		ft.lines <- "%end 1 3 1"
 	}()
 
 	result, err := r.runCommand("list-windows")
@@ -232,7 +232,7 @@ func TestRouterUnexpectedEndEmitsErrorEvent(t *testing.T) {
 		ready:    make(chan struct{}),
 	}
 
-	r.handleEnd("%end 100 9 0")
+	r.handleEnd("%end 100 9 1")
 	select {
 	case evt := <-r.events:
 		if evt.Name != "unexpected-end" {
@@ -272,10 +272,10 @@ func TestRouterInitialCommandAbsorbed(t *testing.T) {
 	// Now send a real command — it should not be affected by the initial pair.
 	go func() {
 		<-ft.sendC
-		ft.lines <- "%begin 1712000001 1 0"
+		ft.lines <- "%begin 1712000001 1 1"
 		ft.lines <- "line1"
 		ft.lines <- "line2"
-		ft.lines <- "%end 1712000001 1 0"
+		ft.lines <- "%end 1712000001 1 1"
 	}()
 
 	result, err := r.runCommand("list-commands")
@@ -301,9 +301,9 @@ func TestRouterInitialCommandWithOutput(t *testing.T) {
 
 	go func() {
 		<-ft.sendC
-		ft.lines <- "%begin 1712000001 1 0"
+		ft.lines <- "%begin 1712000001 1 1"
 		ft.lines <- "result"
-		ft.lines <- "%end 1712000001 1 0"
+		ft.lines <- "%end 1712000001 1 1"
 	}()
 
 	result, err := r.runCommand("display-message")
@@ -330,9 +330,9 @@ func TestRouterInitialCommandWithEvents(t *testing.T) {
 
 	go func() {
 		<-ft.sendC
-		ft.lines <- "%begin 1712000001 1 0"
+		ft.lines <- "%begin 1712000001 1 1"
 		ft.lines <- "ok"
-		ft.lines <- "%end 1712000001 1 0"
+		ft.lines <- "%end 1712000001 1 1"
 	}()
 
 	result, err := r.runCommand("list-sessions")
@@ -395,9 +395,9 @@ func TestRouterEnqueueOrderMatchesSendOrder(t *testing.T) {
 	// Complete all commands so goroutines can exit.
 	for i, cmd := range sent {
 		num := fmt.Sprintf("%d", i+1)
-		ft.lines <- fmt.Sprintf("%%begin 1 %s 0", num)
+		ft.lines <- fmt.Sprintf("%%begin 1 %s 1", num)
 		ft.lines <- cmd
-		ft.lines <- fmt.Sprintf("%%end 1 %s 0", num)
+		ft.lines <- fmt.Sprintf("%%end 1 %s 1", num)
 	}
 	wg.Wait()
 }
@@ -441,14 +441,14 @@ func TestRouterPercentLinesAsOutputInsideCommand(t *testing.T) {
 	// These should be treated as command output, not events.
 	go func() {
 		<-ft.sendC
-		ft.lines <- "%begin 1 1 0"
+		ft.lines <- "%begin 1 1 1"
 		ft.lines <- "$ echo hello"
 		ft.lines <- "hello"
 		ft.lines <- "%prompt > "
 		ft.lines <- "%sessions-changed"
 		ft.lines <- ""
 		ft.lines <- "trailing"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	result, err := r.runCommand("capture-pane -p -t %1")

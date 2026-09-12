@@ -22,8 +22,8 @@ func TestWindowUnlink(t *testing.T) {
 		if cmd != "unlink-window -k -t @0" {
 			t.Errorf("unexpected command: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := win.Unlink()
@@ -44,8 +44,8 @@ func TestWindowLink(t *testing.T) {
 		if cmd != "link-window -a -s @0 -t othersess" {
 			t.Errorf("unexpected command: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := win.Link("othersess")
@@ -66,8 +66,8 @@ func TestWindowMoveToSession(t *testing.T) {
 		if cmd != "move-window -a -s @0 -t newsess" {
 			t.Errorf("unexpected command: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := win.MoveToSession("newsess")
@@ -88,8 +88,8 @@ func TestWindowSwap(t *testing.T) {
 		if cmd != "swap-window -s @0 -t @1" {
 			t.Errorf("unexpected command: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := win.Swap("@1")
@@ -110,8 +110,8 @@ func TestTmuxUnlinkWindow(t *testing.T) {
 		if cmd != "unlink-window -k -t default:0" {
 			t.Errorf("unexpected command: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.UnlinkWindow("default:0")
@@ -132,8 +132,8 @@ func TestTmuxLinkWindow(t *testing.T) {
 		if cmd != "link-window -a -s @0 -t target" {
 			t.Errorf("unexpected command: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.LinkWindow("@0", "target")
@@ -154,8 +154,8 @@ func TestTmuxMoveWindowToSession(t *testing.T) {
 		if cmd != "move-window -a -s @0 -t newsess" {
 			t.Errorf("unexpected command: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.MoveWindowToSession("@0", "newsess")
@@ -176,8 +176,8 @@ func TestTmuxSwapWindows(t *testing.T) {
 		if cmd != "swap-window -s @0 -t @1" {
 			t.Errorf("unexpected command: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.SwapWindows("@0", "@1")
@@ -198,8 +198,8 @@ func TestTmuxSelectWindow(t *testing.T) {
 		if cmd != "select-window -t default:0" {
 			t.Errorf("unexpected command: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.SelectWindow("default:0")
@@ -220,8 +220,8 @@ func TestTmuxSelectPane(t *testing.T) {
 		if cmd != "select-pane -t %5" {
 			t.Errorf("unexpected command: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.SelectPane("%5")
@@ -248,8 +248,8 @@ func TestNewWindowWithIndex(t *testing.T) {
 		if !strings.Contains(cmd, "-t $1:2") {
 			t.Errorf("expected target $1:2, got command: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	_, err := sess.NewWindow(&NewWindowOptions{Index: &idx})
@@ -271,8 +271,8 @@ func TestNewWindowWithIndexZero(t *testing.T) {
 		if !strings.Contains(cmd, "-t $1:0") {
 			t.Errorf("expected target $1:0, got command: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	_, err := sess.NewWindow(&NewWindowOptions{Index: &idx})
@@ -293,8 +293,8 @@ func TestNewWindowWithShellCommand(t *testing.T) {
 		if !strings.Contains(cmd, "'cat /tmp/pane.txt; exec bash'") {
 			t.Errorf("expected shell command in output, got: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	_, err := sess.NewWindow(&NewWindowOptions{
@@ -319,8 +319,8 @@ func TestNewWindowQuotesShellCommand(t *testing.T) {
 		if !strings.HasSuffix(cmd, "'printf '\\''hi'\\''; exec bash'") {
 			t.Errorf("expected properly escaped shell command, got %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	_, err := session.NewWindow(&NewWindowOptions{
@@ -341,8 +341,8 @@ func TestSessionWindowNavigationUsesSessionId(t *testing.T) {
 
 	go func() {
 		for range ft.sendC {
-			ft.lines <- "%begin 1 1 0"
-			ft.lines <- "%end 1 1 0"
+			ft.lines <- "%begin 1 1 1"
+			ft.lines <- "%end 1 1 1"
 		}
 	}()
 
@@ -379,8 +379,8 @@ func TestTmuxSelectLayout(t *testing.T) {
 		if !strings.Contains(cmd, "select-layout") {
 			t.Errorf("unexpected command: %s", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	win := &Window{Id: "@0", tmux: tmux}
@@ -408,8 +408,8 @@ func TestTmuxSelectLayoutByTarget(t *testing.T) {
 		if !strings.Contains(cmd, "bb62,80x24,0,0{40x24,0,0,1,39x24,41,0,2}") {
 			t.Errorf("expected layout string, got: %q", cmd)
 		}
-		ft.lines <- "%begin 1 1 0"
-		ft.lines <- "%end 1 1 0"
+		ft.lines <- "%begin 1 1 1"
+		ft.lines <- "%end 1 1 1"
 	}()
 
 	err := tmux.SelectLayout("mysess:2", "bb62,80x24,0,0{40x24,0,0,1,39x24,41,0,2}")
