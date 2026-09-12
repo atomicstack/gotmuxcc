@@ -410,15 +410,39 @@ func parseExtendedOutputNotification(e Event) Notification {
 
 // parseLayoutChangeNotification parses %layout-change.
 // Format: %layout-change @<wid> <layout> <visible-layout> <flags>
+//
+// tmux expands a fixed four-variable template in place (control-notify.c), so
+// the four positions are always present but two of them can be empty:
+//
+//   - #{window_raw_flags} is empty for a window that is not current, last,
+//     marked or zoomed and has no activity, bell, silence or modal pane, which
+//     leaves the line ending in a space;
+//   - both layout fields are empty for a window whose only panes are floating,
+//     because the v1 compatibility dump has no tiled content to emit.
+//
+// Splitting on runs of whitespace loses those positions, so the fields are
+// taken positionally. Layout strings never contain a space in either the v1
+// or the v2 (JSON subset) encoding, so a single-space split is exact.
 func parseLayoutChangeNotification(e Event) Notification {
-	if len(e.Fields) < 4 {
+	const wantFields = 4
+
+	parts := strings.SplitN(e.Data, " ", wantFields)
+	// A window id plus at least the two layout positions must be present; a
+	// shorter line is malformed rather than merely carrying empty fields.
+	if len(parts) < wantFields-1 || parts[0] == "" {
 		return nil
 	}
+	for len(parts) < wantFields {
+		// Only a trailing empty flags field can be missing here: parseEvent
+		// trims the line, so the final separator is already gone.
+		parts = append(parts, "")
+	}
+
 	return &LayoutChangeNotification{
-		WindowID:      e.Fields[0],
-		Layout:        e.Fields[1],
-		VisibleLayout: e.Fields[2],
-		Flags:         strings.Join(e.Fields[3:], " "),
+		WindowID:      parts[0],
+		Layout:        parts[1],
+		VisibleLayout: parts[2],
+		Flags:         parts[3],
 	}
 }
 
