@@ -177,7 +177,7 @@ func TestSetPaneOutput(t *testing.T) {
 
 	go func() {
 		cmd := <-ft.sendC
-		expected := "refresh-client -A %0:on"
+		expected := "refresh-client -A '%0:on'"
 		if cmd != expected {
 			t.Errorf("expected %q, got %q", expected, cmd)
 		}
@@ -200,7 +200,7 @@ func TestEnablePaneOutput(t *testing.T) {
 
 	go func() {
 		cmd := <-ft.sendC
-		if cmd != "refresh-client -A %1:on" {
+		if cmd != "refresh-client -A '%1:on'" {
 			t.Errorf("unexpected command: %q", cmd)
 		}
 		ft.lines <- "%begin 1 1 0"
@@ -222,7 +222,7 @@ func TestDisablePaneOutput(t *testing.T) {
 
 	go func() {
 		cmd := <-ft.sendC
-		if cmd != "refresh-client -A %2:off" {
+		if cmd != "refresh-client -A '%2:off'" {
 			t.Errorf("unexpected command: %q", cmd)
 		}
 		ft.lines <- "%begin 1 1 0"
@@ -244,7 +244,7 @@ func TestPausePaneOutput(t *testing.T) {
 
 	go func() {
 		cmd := <-ft.sendC
-		if cmd != "refresh-client -A %0:pause" {
+		if cmd != "refresh-client -A '%0:pause'" {
 			t.Errorf("unexpected command: %q", cmd)
 		}
 		ft.lines <- "%begin 1 1 0"
@@ -266,7 +266,7 @@ func TestContinuePaneOutput(t *testing.T) {
 
 	go func() {
 		cmd := <-ft.sendC
-		if cmd != "refresh-client -A %0:continue" {
+		if cmd != "refresh-client -A '%0:continue'" {
 			t.Errorf("unexpected command: %q", cmd)
 		}
 		ft.lines <- "%begin 1 1 0"
@@ -288,7 +288,9 @@ func TestSetMultiplePaneOutputs(t *testing.T) {
 
 	go func() {
 		cmd := <-ft.sendC
-		if !strings.Contains(cmd, "-A %0:on") || !strings.Contains(cmd, "-A %1:off") {
+		// Each entry is quoted; tmux rejects a bare leading-% word that is
+		// not all digits. See needsPercentQuoting.
+		if !strings.Contains(cmd, "-A '%0:on'") || !strings.Contains(cmd, "-A '%1:off'") {
 			t.Errorf("expected multiple -A flags: %s", cmd)
 		}
 		ft.lines <- "%begin 1 1 0"
@@ -352,7 +354,9 @@ func TestReportPaneColorsSimple(t *testing.T) {
 
 	go func() {
 		cmd := <-ft.sendC
-		expected := "refresh-client -r %5:STD1234567"
+		// Quoted: tmux would lex a bare "%5:STD1234567" as a conditional
+		// keyword and reject it. See needsPercentQuoting.
+		expected := "refresh-client -r '%5:STD1234567'"
 		if cmd != expected {
 			t.Errorf("expected %q, got %q", expected, cmd)
 		}

@@ -141,6 +141,30 @@ func buildCommand(parts []string) (string, error) {
 	return strings.Join(escaped, " "), nil
 }
 
+// needsPercentQuoting reports whether tmux's parser would reject arg because
+// it begins with "%".
+//
+// tmux lexes a word starting with "%" as a conditional keyword unless every
+// character of that word is "%" or a digit (cmd-parse.y, yylex): the scan
+// breaks at the first other character, and what follows must then be one of
+// %hidden/%if/%else/%elif/%endif or the token is a syntax error. So a bare
+// pane target such as "%0" parses fine, while "%0:on" — the argument shape
+// refresh-client -A and -r take — does not, and must be quoted.
+//
+// A "%" anywhere but the first byte is an ordinary character and needs no
+// quoting, so this deliberately does not fire on, say, "50%".
+func needsPercentQuoting(arg string) bool {
+	if !strings.HasPrefix(arg, "%") {
+		return false
+	}
+	for _, r := range arg {
+		if r != '%' && (r < '0' || r > '9') {
+			return true
+		}
+	}
+	return false
+}
+
 func quoteArgument(arg string) string {
 	if arg == "" {
 		return "''"
@@ -148,7 +172,7 @@ func quoteArgument(arg string) string {
 	// strip control characters that could inject commands into the
 	// line-oriented control-mode protocol.
 	arg = sanitizeControlArg(arg)
-	if strings.ContainsAny(arg, " \t'\"\\#;{}~") {
+	if needsPercentQuoting(arg) || strings.ContainsAny(arg, " \t'\"\\#;{}~") {
 		escaped := strings.ReplaceAll(arg, "'", "'\\''")
 		return "'" + escaped + "'"
 	}
