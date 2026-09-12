@@ -318,8 +318,9 @@ Fields:
 - `WindowLayout` (string)
   - `WindowLayoutEvenHorizontal`
   - `WindowLayoutEvenVertical`
-  - `WindowLayoutMainVertical` *(source constant named `main-horizontal`; note potential typo in original)*
+  - `WindowLayoutMainVertical` *(value is `main-horizontal`; the name and value disagree in gotmux and the value is kept for drop-in parity — use `WindowLayoutMainVerticalLayout` for `main-vertical`)*
   - `WindowLayoutTiled`
+  - gotmuxcc additions, covering the rest of tmux's `layout_sets`: `WindowLayoutMainHorizontalLayout`, `WindowLayoutMainVerticalLayout`, `WindowLayoutMainHorizontalMirror`, `WindowLayoutMainVerticalMirror`
 - `PanePosition` (string)
   - `PanePositionUp`
   - `PanePositionRight`

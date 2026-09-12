@@ -9,6 +9,10 @@ func checkSessionName(name string) bool {
 	if name == "" {
 		return false
 	}
+	// ":" and "." are rejected even though tmux itself allows them again since
+	// 166267c8: gotmuxcc builds targets like "name:index" and falls back to
+	// name-based lookups, both of which a separator in a name would break.
+	// This is a deliberate gotmuxcc constraint, not a tmux one.
 	if strings.ContainsAny(name, ":.\n\r\x00") {
 		return false
 	}

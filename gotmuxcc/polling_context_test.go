@@ -37,8 +37,8 @@ func TestPollingContextCancellation(t *testing.T) {
 			_, err := api.DisplayMessageContext(ctx, "a b", "#{client_name}")
 			return err
 		}},
-		{name: "flags", prefix: "refresh-client -f 'no-output;new-layouts'", call: func(api pollingContextAPI, ctx context.Context) error {
-			return api.SetControlFlagsContext(ctx, "no-output;new-layouts")
+		{name: "flags", prefix: "refresh-client -f no-output,new-layouts", call: func(api pollingContextAPI, ctx context.Context) error {
+			return api.SetControlFlagsContext(ctx, "no-output,new-layouts")
 		}},
 	}
 	for _, method := range methods {

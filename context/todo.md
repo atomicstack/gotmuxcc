@@ -19,14 +19,14 @@
   `quoteArgument()` to posArgs too (would require removing the manual quoting at all
   call sites).
 
-- **`%begin` flags hardening is deliberately soft**: `handleBegin` refuses to pair
-  a `%begin` whose flags field is not `1` with a queued request only while the
-  initial attach block is still outstanding. tmux sets that field from
-  `!!(state->flags & CMDQ_STATE_CONTROL)` (verified back to 3.0a), so a strict
-  "flags must be 1" rule would be more defensive — but it would make gotmuxcc hang
-  on any tmux that ever emitted `0` for a typed command, and it would require
-  rewriting all 112 `%begin … 0` fixtures in the unit tests. Revisit if a minimum
-  tmux version is ever declared.
+- **`%begin` flags hardening — DONE (2026-09-12)**: the soft rule was the bug, not
+  the safe option. A command run by a hook is inserted into this client's own queue
+  and guarded like any other, so it arrives as an unrequested `%begin/%end` pair with
+  flags `0`; pairing that with `pending[0]` handed the request the hook's output and
+  put every later reply off by one. `handleBegin` now never pairs a non-`1` block with
+  a queued request and tracks it under a sentinel label instead. The 222 `%begin … 0`
+  fixtures were corrected to `1` — real tmux never sends `0` for a typed command — and
+  the handshake/initial-attach fixtures, which genuinely carry `0`, were left alone.
 
 - **Upstream, not gotmuxcc — `capture-pane -p` truncates at NUL**: tmux writes the
   buffer with `control_write(c, "%.*s", (int)len, buf)` (`cmd-capture-pane.c:441`)
@@ -43,4 +43,6 @@ These were identified by comparing gotmuxcc against the tmux C source and have
 not yet been implemented:
 
 - **Clipboard request** (`refresh-client -l`): request terminal clipboard via
-  xterm escape sequences.
+  xterm escape sequences. Note the semantics changed upstream in `322adfbd`: the
+  forward-to-pane ability was removed from `-l`, and forwarding is now controlled by
+  a `get-clipboard` server option (`options-table.c:437`), off by default.

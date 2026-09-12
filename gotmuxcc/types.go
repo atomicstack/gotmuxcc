@@ -92,6 +92,10 @@ type Window struct {
 	CellHeight         int
 	CellWidth          int
 	EndFlag            bool
+	// Flags holds the window flag characters, as tmux formats them in
+	// window_printable_flags: "#" activity, "!" bell, "~" silence, "*"
+	// current, "-" last, "M" marked, "Z" zoomed, and on tmux 3.8 and later
+	// "O" when the window has a modal pane.
 	Flags              string
 	Format             bool
 	Height             int
@@ -102,17 +106,21 @@ type Window struct {
 	Linked             bool
 	LinkedSessions     int
 	LinkedSessionsList []string
-	// ManualHeight and ManualWidth are the window's manually set size, if any.
+	// ManualHeight and ManualWidth are the window's manually set size, if
+	// any. tmux reports these as the empty string when window-size is not
+	// "manual", which parses to 0 — unambiguous, because tmux refuses a
+	// manual size below 1 ("width too small"), so 0 always means "not set".
 	ManualHeight int
 	ManualWidth  int
 	MarkedFlag   bool
 	// ModalPane is the id of the window's modal pane, if any.
-	ModalPane     string
-	Name          string
-	Session       string
-	OffsetX       int
-	OffsetY       int
-	Panes         int
+	ModalPane string
+	Name      string
+	Session   string
+	OffsetX   int
+	OffsetY   int
+	Panes     int
+	// RawFlags holds the same characters as Flags without tmux's padding.
 	RawFlags      string
 	SilenceFlag   int
 	StackIndex    int
@@ -140,8 +148,9 @@ type Pane struct {
 	DeadStatus     int
 	DeadTime       string
 	Fg             string
-	// Flags holds the pane flag characters (* - Z, plus F for floating and
-	// O for modal on tmux 3.8 and later).
+	// Flags holds the pane flag characters, as tmux formats them in
+	// window_pane_printable_flags: "*" active, "-" last, "Z" zoomed, and on
+	// tmux 3.8 and later "F" floating, "O" modal and "A" float-above-zoom.
 	Flags string
 	// FloatingFlag reports whether the pane is a floating pane. Floating panes
 	// are ordinary members of the window's pane list on tmux 3.8 and later, so
@@ -201,8 +210,22 @@ type WindowLayout string
 const (
 	WindowLayoutEvenHorizontal WindowLayout = "even-horizontal"
 	WindowLayoutEvenVertical   WindowLayout = "even-vertical"
-	WindowLayoutMainVertical   WindowLayout = "main-horizontal"
-	WindowLayoutTiled          WindowLayout = "tiled"
+
+	// WindowLayoutMainVertical selects tmux's "main-horizontal" layout, not
+	// "main-vertical". The name and value disagree in gotmux, and gotmuxcc
+	// mirrors gotmux's public API exactly, so the value is deliberately left
+	// as it is: changing it would silently alter the layout every existing
+	// caller gets. Use WindowLayoutMainVerticalLayout for "main-vertical".
+	WindowLayoutMainVertical WindowLayout = "main-horizontal"
+
+	WindowLayoutTiled WindowLayout = "tiled"
+
+	// The remaining layouts tmux accepts (layout-set.c, layout_sets). These
+	// are additions, not part of the gotmux surface.
+	WindowLayoutMainHorizontalLayout WindowLayout = "main-horizontal"
+	WindowLayoutMainVerticalLayout   WindowLayout = "main-vertical"
+	WindowLayoutMainHorizontalMirror WindowLayout = "main-horizontal-mirrored"
+	WindowLayoutMainVerticalMirror   WindowLayout = "main-vertical-mirrored"
 )
 
 // PanePosition enumerates select-pane targets.

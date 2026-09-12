@@ -47,16 +47,28 @@ func (t *Tmux) ClearWindowSize(windowID string) error {
 
 // --- Flow control (refresh-client -f / -A) ---
 
-// SetControlFlags sets control-mode client flags via `refresh-client -f`.
-// Multiple flags can be comma-separated, e.g. "pause-after=1000,no-output".
+// SetControlFlags sets client flags via `refresh-client -f`.
 //
-// Supported flags:
-//   - "no-output": suppress pane output notifications
-//   - "pause-after": enable pause-after mode without age limit
-//   - "pause-after=<ms>": enable pause-after with age threshold in seconds
-//   - "wait-exit": wait for empty line before exit on detach
+// Flags are comma-separated, e.g. "pause-after=10,no-output". tmux splits on
+// commas only (server_client_set_flags), so any other separator leaves the
+// whole string unmatched and silently sets nothing. Unknown flag names are
+// likewise ignored rather than reported as an error.
 //
-// Prefix a flag with "!" to toggle it off (e.g. "!no-output").
+// Control-mode flags:
+//   - "no-output": suppress %output notifications
+//   - "pause-after": enable pause-after mode with no age limit
+//   - "pause-after=<seconds>": enable pause-after with an age threshold,
+//     in seconds (tmux multiplies by 1000 internally)
+//   - "wait-exit": wait for an empty line before exiting on detach
+//   - "new-layouts": receive layout strings in tmux's v2 JSON format rather
+//     than the v1 checksum format control clients get by default. Changes the
+//     content of Window.Layout, Window.VisibleLayout and %layout-change.
+//     Requires tmux 3.8 or later.
+//
+// Flags accepted from any client: "read-only", "ignore-size",
+// "no-detach-on-destroy".
+//
+// Prefix a flag with "!" to turn it off (e.g. "!no-output").
 func (t *Tmux) SetControlFlags(flags string) error {
 	return t.SetControlFlagsContext(context.Background(), flags)
 }

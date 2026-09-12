@@ -1,3 +1,39 @@
+- Fixed five defects found by auditing gotmuxcc against tmux `e880cf63`
+  (**next-3.9**). Full audit, with transcripts:
+  `~/obsidian/agent-notes/gotmuxcc/2026-09-12/tmux-next-39-library-audit.md`;
+  work plan in `TMUX_NEXT39_FIXES_2026-09-12.md`. Nothing had regressed from the
+  tmux upgrade itself — the suite passed against next-3.9 before any change — but
+  four of the five were long-standing and one was new with 3.8.
+  - `quoteArgument` now quotes a leading `%` when tmux's lexer would read it as a
+    conditional keyword (`cmd-parse.y`, yylex: a `%`-word is a keyword unless every
+    character is `%` or a digit). `refresh-client -A %0:on` was a hard parse error,
+    so `SetPaneOutput`, `EnablePaneOutput`, `DisablePaneOutput`, `PausePaneOutput`,
+    `ContinuePaneOutput`, `SetMultiplePaneOutputs` and `ReportPaneColors` had never
+    worked against a real server — broken since tmux 3.0. Six unit expectations
+    asserted the unparseable strings, which is why nothing caught it. Quoting
+    mirrors the lexer rule, so bare `-t %0` targets keep their wire format.
+  - The router no longer pairs a hook's guard block with a queued request. See the
+    todo.md entry: this is the case that was recorded as deliberately soft.
+  - `%layout-change` is parsed positionally, so lines with an empty
+    `#{window_raw_flags}` (common) or empty layout fields (a window whose only panes
+    float, new with 3.8) are no longer dropped entirely.
+  - `discoverAttachTarget` asks for `#{session_id}`, not `#{session_name}`. tmux
+    allows `:` and `.` in names again since `166267c8`, and `attach-session -t` reads
+    those as target separators, so the client attached to nothing and every call
+    failed with "tmux exit". Reported by tmux-popup-control.
+  - `Options` passes `show-options -H`, restoring user options registered as hooks
+    that tmux `7277712c` began hiding, with a fallback for servers predating the flag.
+  - Smaller: `SetControlFlags` documents `new-layouts` and the comma-only separator
+    and corrects seconds-vs-ms; `WindowLayoutMainVertical` keeps its gotmux-inherited
+    `main-horizontal` value (changing it would break drop-in parity) but the four
+    layouts tmux accepts are now available as additive constants; pane and window
+    flag characters are documented including 3.8's `A` and `O`.
+  - Two upstream tmux bugs were found and written up in
+    `~/git_tree/tmux/CONTROL_MODE_BUGS_2026-09-12.md`: `CLIENT_CONTROL_DISCARD`
+    duplicates `CLIENT_BRACKETPASTING` in `tmux.h`, and the `new-layouts` client flag
+    is not honoured for `refresh-client -B` subscriptions because `monitor.c` builds
+    its format tree with a NULL client.
+
 ## Current state
 
 Here’s what’s happened so far:
