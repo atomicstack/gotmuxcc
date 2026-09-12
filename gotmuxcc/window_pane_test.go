@@ -192,7 +192,7 @@ func TestListAllWindowsFallback(t *testing.T) {
 	}()
 
 	responses := []scriptedResponse{
-		{match: "list-windows -a", lines: []string{"%begin 1 1 0", "%end 1 1 0"}},
+		{match: "list-windows -a", lines: []string{"%begin 1 1 0", "aggregate unavailable", "%error 1 1 0"}},
 		{match: "list-sessions", lines: []string{
 			"%begin 1 1 0",
 			formatRecord(sessionVars, map[string]string{
@@ -261,8 +261,8 @@ func TestListAllPanesFallback(t *testing.T) {
 	}()
 
 	responses := []scriptedResponse{
-		{match: "list-panes -a", lines: []string{"%begin 1 1 0", "%end 1 1 0"}},
-		{match: "list-windows -a", lines: []string{"%begin 1 1 0", "%end 1 1 0"}},
+		{match: "list-panes -a", lines: []string{"%begin 1 1 0", "aggregate unavailable", "%error 1 1 0"}},
+		{match: "list-windows -a", lines: []string{"%begin 1 1 0", "aggregate unavailable", "%error 1 1 0"}},
 		{match: "list-sessions", lines: []string{
 			"%begin 1 1 0",
 			formatRecord(sessionVars, map[string]string{

@@ -3,6 +3,7 @@ package gotmuxcc
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 )
@@ -11,9 +12,10 @@ import (
 // wedged. It is what makes the cancellation tests deterministic: without a
 // context the calls below would block forever.
 type silentTransport struct {
-	lines chan string
-	done  chan error
-	sentC chan string
+	lines     chan string
+	done      chan error
+	sentC     chan string
+	closeOnce sync.Once
 }
 
 func newSilentTransport() *silentTransport {
@@ -33,7 +35,10 @@ func (s *silentTransport) Send(cmd string) error {
 }
 func (s *silentTransport) Lines() <-chan string { return s.lines }
 func (s *silentTransport) Done() <-chan error   { return s.done }
-func (s *silentTransport) Close() error         { return nil }
+func (s *silentTransport) Close() error {
+	s.closeOnce.Do(func() { close(s.lines); close(s.done) })
+	return nil
+}
 
 func silentTmux(t *testing.T) (*Tmux, *silentTransport) {
 	t.Helper()

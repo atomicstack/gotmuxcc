@@ -31,7 +31,9 @@ type Transport struct {
 	lines chan string
 	done  chan error
 
+	// sendMu serializes writes; mu protects state and is never held during I/O.
 	sendMu    sync.Mutex
+	mu        sync.Mutex
 	closeOnce sync.Once
 	closeErr  error
 	finished  bool
@@ -183,12 +185,14 @@ func (t *Transport) Send(line string) error {
 	t.sendMu.Lock()
 	defer t.sendMu.Unlock()
 
-	if t.closeErr != nil {
-		return t.closeErr
+	t.mu.Lock()
+	err := t.closeErr
+	if err == nil && (t.finished || t.closing) {
+		err = ErrClosed
 	}
-
-	if t.finished {
-		return ErrClosed
+	t.mu.Unlock()
+	if err != nil {
+		return err
 	}
 
 	if !strings.HasSuffix(line, "\n") {
@@ -228,9 +232,9 @@ func (t *Transport) Close() error {
 	trace.Printf("transport", "Close requested")
 
 	t.closeOnce.Do(func() {
-		t.sendMu.Lock()
+		t.mu.Lock()
 		t.closing = true
-		t.sendMu.Unlock()
+		t.mu.Unlock()
 		// Cancel the lifetime context first: this is an independent kill path
 		// (via exec.CommandContext) that fires even if Process.Kill is racing a
 		// just-exited child.
@@ -244,12 +248,14 @@ func (t *Transport) Close() error {
 		}
 	})
 
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	return t.closeErr
 }
 
 func (t *Transport) finish(err error) {
-	t.sendMu.Lock()
-	defer t.sendMu.Unlock()
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
 	if t.finished {
 		return

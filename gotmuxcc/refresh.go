@@ -1,6 +1,7 @@
 package gotmuxcc
 
 import (
+	"context"
 	"fmt"
 	"strings"
 )
@@ -57,7 +58,12 @@ func (t *Tmux) ClearWindowSize(windowID string) error {
 //
 // Prefix a flag with "!" to toggle it off (e.g. "!no-output").
 func (t *Tmux) SetControlFlags(flags string) error {
-	_, err := t.runCommand(fmt.Sprintf("refresh-client -f %s", quoteArgument(flags)))
+	return t.SetControlFlagsContext(context.Background(), flags)
+}
+
+// SetControlFlagsContext is SetControlFlags with cancellation.
+func (t *Tmux) SetControlFlagsContext(ctx context.Context, flags string) error {
+	_, err := t.runCommandContext(ctx, fmt.Sprintf("refresh-client -f %s", quoteArgument(flags)))
 	if err != nil {
 		return fmt.Errorf("failed to set control flags: %w", err)
 	}

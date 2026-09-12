@@ -1,6 +1,9 @@
 package gotmuxcc
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+)
 
 func (q *query) clientVars() *query {
 	return q.vars(
@@ -65,10 +68,15 @@ func (q queryResult) toClient(t *Tmux) *Client {
 
 // ListClients enumerates tmux clients.
 func (t *Tmux) ListClients() ([]*Client, error) {
+	return t.ListClientsContext(context.Background())
+}
+
+// ListClientsContext is ListClients with cancellation.
+func (t *Tmux) ListClientsContext(ctx context.Context) ([]*Client, error) {
 	output, err := t.query().
 		cmd("list-clients").
 		clientVars().
-		run()
+		runContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list clients: %w", err)
 	}

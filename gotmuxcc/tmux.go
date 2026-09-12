@@ -18,6 +18,7 @@ type controlTransport interface {
 	// Done signals the transport has terminated and returns the exit error, if any.
 	Done() <-chan error
 	// Close terminates the transport and underlying tmux process.
+	// It must unblock any concurrent Send call without waiting for that call.
 	Close() error
 }
 

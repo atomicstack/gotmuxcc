@@ -267,7 +267,11 @@ func (w *Window) ListActiveClients() ([]*Client, error) {
 	return clients, nil
 }
 
-// ListAllWindows lists all tmux windows across sessions.
+// ListAllWindows lists window links across sessions. A window linked into
+// multiple sessions appears once per session/index, with link-specific fields.
+// Successful aggregate output, including an empty result, is returned directly.
+// On command failure, it scans sessions, skipping resources that disappear;
+// if recovery yields no windows, the original aggregate error is returned.
 func (t *Tmux) ListAllWindows() ([]*Window, error) {
 	return t.ListAllWindowsContext(context.Background())
 }
@@ -276,15 +280,26 @@ func (t *Tmux) ListAllWindows() ([]*Window, error) {
 // every command in the fallback chain, not just the first.
 func (t *Tmux) ListAllWindowsContext(ctx context.Context) ([]*Window, error) {
 	windows, directErr := t.listAllWindowsDirect(ctx)
-	windowMap := make(map[string]*Window, len(windows))
-	for _, w := range windows {
-		windowMap[w.Id] = w
+	if directErr == nil {
+		return windows, nil
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	type windowLink struct {
+		session string
+		index   int
+		id      string
+	}
+	windowMap := make(map[windowLink]struct{})
 
 	sessions, err := t.ListSessionsContext(ctx)
 	if err == nil {
 		for _, session := range sessions {
 			ws, serr := session.listWindowsContext(ctx)
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
 			if serr != nil {
 				continue
 			}
@@ -292,19 +307,21 @@ func (t *Tmux) ListAllWindowsContext(ctx context.Context) ([]*Window, error) {
 				if strings.TrimSpace(w.Session) == "" {
 					w.Session = session.Name
 				}
-				if _, ok := windowMap[w.Id]; ok {
+				key := windowLink{session: w.Session, index: w.Index, id: w.Id}
+				if _, ok := windowMap[key]; ok {
 					continue
 				}
-				windowMap[w.Id] = w
+				windowMap[key] = struct{}{}
 				windows = append(windows, w)
 			}
 		}
 	}
 
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if len(windows) == 0 {
-		if directErr != nil {
-			return nil, directErr
-		}
+		return nil, directErr
 	}
 	return windows, nil
 }
@@ -322,7 +339,11 @@ func (t *Tmux) listAllWindowsDirect(ctx context.Context) ([]*Window, error) {
 	return collectAs(output, t, queryResult.toWindow), nil
 }
 
-// ListAllPanes lists all panes across sessions.
+// ListAllPanes lists all panes across sessions, preserving aggregate rows.
+// Successful aggregate output, including an empty result, is returned directly.
+// On command failure, it scans windows and deduplicates panes by id, skipping
+// resources that disappear. If recovery yields no panes, it returns the
+// original aggregate error.
 func (t *Tmux) ListAllPanes() ([]*Pane, error) {
 	return t.ListAllPanesContext(context.Background())
 }
@@ -331,15 +352,21 @@ func (t *Tmux) ListAllPanes() ([]*Pane, error) {
 // every command in the fallback chain, not just the first.
 func (t *Tmux) ListAllPanesContext(ctx context.Context) ([]*Pane, error) {
 	panes, directErr := t.listAllPanesDirect(ctx)
-	paneMap := make(map[string]*Pane, len(panes))
-	for _, p := range panes {
-		paneMap[p.Id] = p
+	if directErr == nil {
+		return panes, nil
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	paneMap := make(map[string]*Pane)
 
 	windows, err := t.ListAllWindowsContext(ctx)
 	if err == nil {
 		for _, window := range windows {
 			ps, serr := window.listPanesContext(ctx)
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
 			if serr != nil {
 				continue
 			}
@@ -353,10 +380,11 @@ func (t *Tmux) ListAllPanesContext(ctx context.Context) ([]*Pane, error) {
 		}
 	}
 
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if len(panes) == 0 {
-		if directErr != nil {
-			return nil, directErr
-		}
+		return nil, directErr
 	}
 	return panes, nil
 }

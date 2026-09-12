@@ -82,6 +82,13 @@ func (cr *commandRequest) waitContext(ctx context.Context) (commandResult, error
 	}
 }
 
+// commandSubmission transfers a request and its cancellation boundary to the
+// router-owned writer. the context lives only for this queued operation.
+type commandSubmission struct {
+	ctx     context.Context
+	request *commandRequest
+}
+
 type commandState struct {
 	request *commandRequest
 	time    string
@@ -110,6 +117,10 @@ func (e *commandError) Error() string {
 
 type router struct {
 	transport controlTransport
+
+	writerOnce  sync.Once
+	submissions chan commandSubmission
+	writerDone  chan struct{}
 
 	mu       sync.Mutex
 	pending  []*commandRequest
@@ -171,7 +182,12 @@ func (r *router) observeDone() {
 		return
 	}
 	trace.Printf("router", "observeDone waiting for transport done")
-	err := <-done
+	var err error
+	select {
+	case err = <-done:
+	case <-r.closed:
+		return
+	}
 	trace.Printf("router", "observeDone received err=%v", err)
 	if err == nil {
 		err = ErrTransportClosed
@@ -191,12 +207,11 @@ func (r *router) readLoop() {
 		r.failAll(ErrTransportClosed)
 		return
 	}
+	// keep draining after a terminal error: Done may precede stdout completion,
+	// and the transport producer must finish before its subprocess can be reaped.
 	for line := range lines {
-		line = strings.TrimRight(line, "\r\n")
-		r.handleLine(line)
+		r.handleLine(strings.TrimRight(line, "\r\n"))
 	}
-	trace.Printf("router", "readLoop lines channel closed")
-	// Lines channel closed; ensure we surface closure if observeDone hasn't yet.
 	r.failAll(ErrTransportClosed)
 }
 
@@ -592,35 +607,47 @@ func (r *router) failAll(err error) {
 	})
 }
 
-func (r *router) enqueue(req *commandRequest) error {
-	r.mu.Lock()
-	if r.err != nil {
-		err := r.err
-		r.mu.Unlock()
-		trace.Printf("router", "reject -> %s err=%v", trace.FormatControlCommand(req.command), err)
-		return err
-	}
-	r.pending = append(r.pending, req)
-	trace.Printf("router", "queued -> %s (pending=%d)", trace.FormatControlCommand(req.command), len(r.pending))
+// startWriter is lazy so a router that never sends commands needs no writer.
+// one writer owns both pending registration and wire order; r.mu is never held
+// across transport I/O. Close interrupts Send and joins this worker.
+func (r *router) startWriter() {
+	r.writerOnce.Do(func() {
+		r.submissions = make(chan commandSubmission)
+		r.writerDone = make(chan struct{})
+		go r.writeLoop()
+	})
+}
 
-	// Send while still holding the mutex so that the pending queue order
-	// matches the order commands are written to the transport. Releasing
-	// the lock before Send would allow a concurrent enqueue to append and
-	// send its command first, causing response mismatch in handleBegin.
-	if err := r.transport.Send(req.command); err != nil {
-		for idx, pending := range r.pending {
-			if pending == req {
-				r.pending = append(r.pending[:idx], r.pending[idx+1:]...)
-				break
+func (r *router) writeLoop() {
+	defer close(r.writerDone)
+	for {
+		select {
+		case <-r.closed:
+			return
+		case submission := <-r.submissions:
+			req := submission.request
+			r.mu.Lock()
+			err := r.err
+			if err == nil {
+				err = submission.ctx.Err()
+			}
+			if err != nil {
+				r.mu.Unlock()
+				req.fail(err)
+				continue
+			}
+			// register before Send: a response may arrive before the write returns.
+			r.pending = append(r.pending, req)
+			r.mu.Unlock()
+			if err := r.transport.Send(req.command); err != nil {
+				// a failed write may have sent a partial command. continuing would make
+				// response correlation unknowable, so terminate this connection.
+				r.failAll(err)
+				_ = r.transport.Close()
+				return
 			}
 		}
-		trace.Printf("router", "send failed -> %s err=%v", trace.FormatControlCommand(req.command), err)
-		r.mu.Unlock()
-		return err
 	}
-	r.mu.Unlock()
-
-	return nil
 }
 
 func (r *router) runCommand(cmd string) (commandResult, error) {
@@ -638,10 +665,17 @@ func (r *router) runCommandContext(ctx context.Context, cmd string) (commandResu
 	trace.Printf("router", "dispatch -> %s", trace.FormatControlCommand(cmd))
 
 	req := newCommandRequest(cmd)
-	if err := r.enqueue(req); err != nil {
+	r.startWriter()
+	select {
+	case <-ctx.Done():
+		return commandResult{}, ctx.Err()
+	case <-r.closed:
+		r.mu.Lock()
+		err := r.err
+		r.mu.Unlock()
 		return commandResult{}, err
+	case r.submissions <- commandSubmission{ctx: ctx, request: req}:
 	}
-
 	return req.waitContext(ctx)
 }
 
@@ -650,11 +684,14 @@ func (r *router) eventsChannel() <-chan Event {
 }
 
 func (r *router) close() error {
+	r.startWriter()
 	r.failAll(errRouterClosed)
+	var err error
 	if r.transport != nil {
-		return r.transport.Close()
+		err = r.transport.Close()
 	}
-	return nil
+	<-r.writerDone
+	return err
 }
 
 // parseFrame parses a control-mode guard line. tmux writes guards as the

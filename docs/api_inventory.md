@@ -357,6 +357,9 @@ underlying format variables.
 Context-aware variants of the command methods on the polling and preview paths.
 Existing signatures are unchanged and delegate through `context.Background()`.
 - `ListSessionsContext(ctx) ([]*Session, error)`
+- `ListClientsContext(ctx) ([]*Client, error)`
+- `DisplayMessageContext(ctx, target, format) (string, error)`
+- `SetControlFlagsContext(ctx, flags) error`
 - `ListAllWindowsContext(ctx) ([]*Window, error)`
 - `ListAllPanesContext(ctx) ([]*Pane, error)`
 - `CapturePaneContext(ctx, target, *CaptureOptions) (string, error)`
@@ -364,6 +367,16 @@ Existing signatures are unchanged and delegate through `context.Background()`.
 - `ListWindowsFormatContext(ctx, target, filter, format) ([]string, error)`
 - `ListPanesFormatContext(ctx, target, filter, format) ([]string, error)`
 - `CommandContext(ctx, parts ...string) (string, error)`
+
+cancellation covers waiting to send, a blocked transport send, and waiting for the response. a request cancelled before the writer accepts it is not sent. once writing starts, cancellation abandons only the caller’s wait; the command may still execute and retains its response slot. `Close()` interrupts a blocked write and joins the router’s writer. custom transports must make `Close()` unblock concurrent `Send()` calls.
+
+a transport send error closes the connection because a partial write can leave command framing ambiguous. a tmux command error (`%error`) leaves the connection usable. commands are never replayed automatically.
+
+### aggregate listing behavior
+
+`ListAllWindows[Context]` and `ListAllPanes[Context]` return successful aggregate output directly, including empty output. fallback occurs only after an aggregate command error. it skips vanished resources and returns the original aggregate error if no rows can be recovered. cancellation returns the context error and no partial rows.
+
+window results represent session/index links, so linked windows share an id but retain their own session, index and active state. fallback deduplicates by session, index and window id. pane aggregate rows are preserved verbatim; the compatibility fallback continues to deduplicate by physical pane id.
 
 ### Construction
 - `DefaultHandshakeTimeout` (10s) — bounds the initial control-mode handshake wait

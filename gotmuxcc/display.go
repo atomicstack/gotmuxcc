@@ -12,13 +12,18 @@ import (
 //
 //	tmux display-message [-t target] -p <format>
 func (t *Tmux) DisplayMessage(target, format string) (string, error) {
+	return t.DisplayMessageContext(context.Background(), target, format)
+}
+
+// DisplayMessageContext is DisplayMessage with cancellation.
+func (t *Tmux) DisplayMessageContext(ctx context.Context, target, format string) (string, error) {
 	q := t.query().cmd("display-message")
 	if target != "" {
 		q.fargs("-t", target)
 	}
 	q.fargs("-p", format)
 
-	result, err := q.run()
+	result, err := q.runContext(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to display message: %w", err)
 	}

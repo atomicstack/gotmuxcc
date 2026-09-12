@@ -94,7 +94,9 @@ func (t *Tmux) Command(parts ...string) (string, error) {
 }
 
 // CommandContext is Command with cancellation. It is the raw escape hatch, so a
-// context here also covers the helpers that route through it.
+// context here also covers the helpers that route through it. Cancellation can
+// abandon a blocked send or response wait. Once writing starts, the command may
+// still execute; cancellation does not remove its response slot or replay it.
 func (t *Tmux) CommandContext(ctx context.Context, parts ...string) (string, error) {
 	command, err := buildCommand(parts)
 	if err != nil {
