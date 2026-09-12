@@ -236,7 +236,7 @@ func TestSessionOptionHelpersUseSessionIdTarget(t *testing.T) {
 	for _, want := range []string{
 		"set-option -t $1 @foo bar",
 		"show-option -t $1 -v @foo",
-		"show-options -t $1",
+		"show-options -H -t $1",
 		"set-option -t $1 -u @foo",
 	} {
 		if !strings.Contains(joined, want) {

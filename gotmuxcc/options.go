@@ -58,17 +58,38 @@ func (t *Tmux) GlobalOption(key string) (string, error) {
 	return strings.TrimSpace(output.raw()), nil
 }
 
+// Options lists the options set on target at the given level.
+//
+// Since tmux 7277712c ("Switch show-options over to using a format and add
+// -F"), show-options hides "@"-prefixed user options that are registered as
+// hooks unless -H is passed; before that every user option was listed
+// unconditionally. -H is therefore requested first so the result does not
+// silently shrink on a newer server, and the call is retried without it for
+// servers old enough not to know the flag.
 func (t *Tmux) Options(target, level string) ([]*Option, error) {
-	q := t.query().
-		cmd("show-options")
-	if level != "" {
-		q.fargs(level)
+	show := func(withHooks bool) (*queryOutput, error) {
+		q := t.query().
+			cmd("show-options")
+		if level != "" {
+			q.fargs(level)
+		}
+		if withHooks {
+			q.fargs("-H")
+		}
+		q.fargs("-t", target)
+		return q.run()
 	}
-	q.fargs("-t", target)
 
-	output, err := q.run()
+	output, err := show(true)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve options: %w", err)
+		// Either the server predates -H, or the request was bad for some
+		// other reason. Retry without the flag so the older shape still
+		// works, and report that error if it fails too.
+		var fallbackErr error
+		output, fallbackErr = show(false)
+		if fallbackErr != nil {
+			return nil, fmt.Errorf("failed to retrieve options: %w", fallbackErr)
+		}
 	}
 
 	return output.toOptions(), nil
