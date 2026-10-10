@@ -14,6 +14,31 @@ var tmuxListClients = func(path string) ([]byte, error) {
 	return cmd.CombinedOutput()
 }
 
+// tmuxExecCommand runs one tmux command as a plain client, the way gotmux does
+// for every call. gotmuxcc only needs it for new-session while no server is
+// running, since that is the one command that has to work without a
+// control-mode connection to attach to.
+var tmuxExecCommand = func(socketPath string, args []string) ([]byte, error) {
+	full := make([]string, 0, len(args)+2)
+	if strings.TrimSpace(socketPath) != "" {
+		full = append(full, "-S", socketPath)
+	}
+	full = append(full, args...)
+	cmd := exec.Command("tmux", full...)
+	cmd.Env = append(os.Environ(), "TMUX=")
+	out, err := cmd.Output()
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			if msg := strings.TrimSpace(string(exitErr.Stderr)); msg != "" {
+				return nil, fmt.Errorf("%s: %w", msg, err)
+			}
+		}
+		return nil, err
+	}
+	return out, nil
+}
+
 func newSocket(path string) (*Socket, error) {
 	if path == "" {
 		return nil, nil

@@ -1,15 +1,15 @@
 package gotmuxcc
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/atomicstack/gotmuxcc/internal/testutil"
 )
 
-func TestPlanInitialSessionUsesExistingSession(t *testing.T) {
+func TestAttachArgsUsesExistingSession(t *testing.T) {
 	script := `
 if [ "$1" = "-S" ]; then
 	shift
@@ -21,102 +21,50 @@ if [ "$1" != "list-sessions" ]; then
 	exit 3
 fi
 
-printf 'dev\n'
+printf '$0\n'
 `
 	path := writeFakeTmux(t, script)
-	plan, err := planInitialSession(path, "/tmp/sock")
+	args, err := attachArgs(path, "/tmp/sock")
 	if err != nil {
-		t.Fatalf("planInitialSession returned error: %v", err)
+		t.Fatalf("attachArgs returned error: %v", err)
 	}
-	if len(plan.extraArgs) != 3 || plan.extraArgs[0] != "attach-session" || plan.extraArgs[1] != "-t" || plan.extraArgs[2] != "dev" {
-		t.Fatalf("unexpected attach args: %#v", plan.extraArgs)
-	}
-	if plan.bootstrapSession != "" {
-		t.Fatalf("expected no bootstrap session, got %q", plan.bootstrapSession)
+	if len(args) != 3 || args[0] != "attach-session" || args[1] != "-t" || args[2] != "$0" {
+		t.Fatalf("unexpected attach args: %#v", args)
 	}
 }
 
-func TestPlanInitialSessionNoSessionsUsesBootstrapSession(t *testing.T) {
+// TestAttachArgsNoSessionsReportsNoServer pins the replacement for the old
+// bootstrap session: with nothing to attach to, the planner must report
+// ErrNoServer and hand back no command at all, so that the caller never starts
+// a tmux server (and never leaves a stray session behind) just to open a
+// control-mode connection.
+func TestAttachArgsNoSessionsReportsNoServer(t *testing.T) {
 	script := `
+echo "no server running on /tmp/sock" >&2
 exit 1
 `
 	path := writeFakeTmux(t, script)
-	plan, err := planInitialSession(path, "/tmp/sock")
-	if err != nil {
-		t.Fatalf("planInitialSession returned error: %v", err)
+	args, err := attachArgs(path, "/tmp/sock")
+	if !errors.Is(err, ErrNoServer) {
+		t.Fatalf("expected ErrNoServer, got args=%#v err=%v", args, err)
 	}
-	if len(plan.extraArgs) != 4 || plan.extraArgs[0] != "new-session" || plan.extraArgs[1] != "-d" || plan.extraArgs[2] != "-s" {
-		t.Fatalf("unexpected bootstrap args: %#v", plan.extraArgs)
-	}
-	if plan.bootstrapSession == "" {
-		t.Fatalf("expected bootstrap session name")
-	}
-	if plan.extraArgs[3] != plan.bootstrapSession {
-		t.Fatalf("expected bootstrap session name in args, got %#v", plan.extraArgs)
-	}
-	if !strings.HasPrefix(plan.bootstrapSession, "__gotmuxcc_bootstrap_") {
-		t.Fatalf("unexpected bootstrap session name %q", plan.bootstrapSession)
+	if len(args) != 0 {
+		t.Fatalf("expected no command when there is no server, got %#v", args)
 	}
 }
 
-func TestPlanInitialSessionDiscoveryError(t *testing.T) {
+func TestAttachArgsDiscoveryError(t *testing.T) {
 	script := `
 echo "boom" >&2
 exit 3
 `
 	path := writeFakeTmux(t, script)
-	if _, err := planInitialSession(path, "/tmp/sock"); err == nil {
-		t.Fatalf("expected planInitialSession to return error")
+	_, err := attachArgs(path, "/tmp/sock")
+	if err == nil {
+		t.Fatalf("expected attachArgs to return error")
 	}
-}
-
-func TestBootstrapCleanupTransportCloseKillsBootstrapSession(t *testing.T) {
-	logPath := filepath.Join(testutil.TempDir(t), "tmux.log")
-	script := `
-if [ -n "$FAKE_TMUX_LOG" ]; then
-	printf '%s\n' "$*" >> "$FAKE_TMUX_LOG"
-fi
-
-if [ "$1" = "-S" ]; then
-	shift
-	shift
-fi
-
-if [ "$1" != "kill-session" ]; then
-	echo "unexpected command: $1" >&2
-	exit 3
-fi
-`
-	path := writeFakeTmux(t, script)
-	t.Setenv("FAKE_TMUX_LOG", logPath)
-
-	transport := &bootstrapCleanupTransport{
-		controlTransport: newRecordTransport(),
-		tmuxBinary:       path,
-		socketPath:       "/tmp/sock",
-		bootstrapSession: "__gotmuxcc_bootstrap_test",
-	}
-
-	if err := transport.Close(); err != nil {
-		t.Fatalf("Close returned error: %v", err)
-	}
-	if err := transport.Close(); err != nil {
-		t.Fatalf("second Close returned error: %v", err)
-	}
-
-	data, err := os.ReadFile(logPath)
-	if err != nil {
-		t.Fatalf("failed to read log file: %v", err)
-	}
-	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
-	if len(lines) != 1 {
-		t.Fatalf("expected one cleanup command, got %#v", lines)
-	}
-	if want := "kill-session -t __gotmuxcc_bootstrap_test"; !strings.Contains(lines[0], want) {
-		t.Fatalf("expected cleanup command to contain %q, got %q", want, lines[0])
-	}
-	if want := "-S /tmp/sock"; !strings.Contains(lines[0], want) {
-		t.Fatalf("expected cleanup command to contain %q, got %q", want, lines[0])
+	if errors.Is(err, ErrNoServer) {
+		t.Fatalf("a discovery failure must not be reported as ErrNoServer: %v", err)
 	}
 }
 

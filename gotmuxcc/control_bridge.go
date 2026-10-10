@@ -2,75 +2,61 @@ package gotmuxcc
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/atomicstack/gotmuxcc/internal/control"
 )
 
-type initialSessionPlan struct {
-	extraArgs        []string
-	bootstrapSession string
-	tmuxBinary       string
-}
+// ErrNoServer reports that no tmux server is running on the client's socket.
+//
+// gotmuxcc never starts a tmux server on its own: a control-mode client has to
+// attach to an existing session to stay alive, and the only way to conjure one
+// on an empty server is to create a session the user did not ask for. So when
+// there is nothing to attach to, the constructor returns a client without a
+// connection, and commands wrap this error until a session exists. NewSession
+// is the exception: it starts the server exactly as plain tmux would, after
+// which the client connects lazily. Use errors.Is to test for it.
+var ErrNoServer = errors.New("gotmuxcc: no tmux server running")
 
 func newControlTransport(ctx context.Context, socketPath string) (controlTransport, error) {
-	plan, err := planInitialSession("", socketPath)
+	args, err := attachArgs("", socketPath)
 	if err != nil {
+		if errors.Is(err, ErrNoServer) {
+			return nil, err
+		}
 		return nil, fmt.Errorf("gotmux: failed to determine initial control-mode command: %w", err)
 	}
 	cfg := control.Config{
 		SocketPath: socketPath,
-		ExtraArgs:  plan.extraArgs,
+		ExtraArgs:  args,
 	}
 	transport, err := control.New(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("gotmux: failed to establish control transport: %w", err)
 	}
-	if plan.bootstrapSession != "" {
-		return &bootstrapCleanupTransport{
-			controlTransport: transport,
-			tmuxBinary:       plan.tmuxBinary,
-			socketPath:       socketPath,
-			bootstrapSession: plan.bootstrapSession,
-		}, nil
-	}
 	return transport, nil
 }
 
-func initialAttachArgs(tmuxBinary, socketPath string) []string {
-	plan, err := planInitialSession(tmuxBinary, socketPath)
-	if err != nil {
-		return nil
-	}
-	return append([]string(nil), plan.extraArgs...)
-}
-
-func planInitialSession(tmuxBinary, socketPath string) (initialSessionPlan, error) {
+// attachArgs returns the command that opens the control-mode connection: an
+// attach-session targeting the first existing session by id. With no session
+// to attach to it returns ErrNoServer and no command, so the caller spawns
+// nothing.
+func attachArgs(tmuxBinary, socketPath string) ([]string, error) {
 	bin := strings.TrimSpace(tmuxBinary)
 	if bin == "" {
 		bin = "tmux"
 	}
 	target, err := discoverAttachTarget(bin, socketPath)
 	if err != nil {
-		return initialSessionPlan{}, err
+		return nil, err
 	}
 	if target == "" {
-		sessionName := bootstrapSessionName()
-		return initialSessionPlan{
-			extraArgs:        []string{"new-session", "-d", "-s", sessionName},
-			bootstrapSession: sessionName,
-			tmuxBinary:       bin,
-		}, nil
+		return nil, fmt.Errorf("%w on socket %q", ErrNoServer, socketPath)
 	}
-	return initialSessionPlan{
-		extraArgs:  []string{"attach-session", "-t", target},
-		tmuxBinary: bin,
-	}, nil
+	return []string{"attach-session", "-t", target}, nil
 }
 
 func discoverAttachTarget(tmuxBinary, socketPath string) (string, error) {
@@ -87,6 +73,9 @@ func discoverAttachTarget(tmuxBinary, socketPath string) (string, error) {
 	cmd := exec.Command(tmuxBinary, args...)
 	output, err := cmd.Output()
 	if err != nil {
+		// tmux exits 1 both when the server has no sessions and when there
+		// is no server at all ("no server running on ..." / "error
+		// connecting to ..."); either way there is nothing to attach to.
 		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
 			return "", nil
 		}
@@ -100,47 +89,4 @@ func discoverAttachTarget(tmuxBinary, socketPath string) (string, error) {
 		}
 	}
 	return "", nil
-}
-
-func bootstrapSessionName() string {
-	return fmt.Sprintf("__gotmuxcc_bootstrap_%d_%d", os.Getpid(), time.Now().UnixNano())
-}
-
-type bootstrapCleanupTransport struct {
-	controlTransport
-	tmuxBinary       string
-	socketPath       string
-	bootstrapSession string
-	cleanupOnce      sync.Once
-}
-
-func (t *bootstrapCleanupTransport) Close() error {
-	var err error
-	if t.controlTransport != nil {
-		err = t.controlTransport.Close()
-	}
-	t.cleanupOnce.Do(func() {
-		cleanupBootstrapSession(t.tmuxBinary, t.socketPath, t.bootstrapSession)
-	})
-	return err
-}
-
-func cleanupBootstrapSession(tmuxBinary, socketPath, sessionName string) {
-	if strings.TrimSpace(sessionName) == "" {
-		return
-	}
-
-	bin := strings.TrimSpace(tmuxBinary)
-	if bin == "" {
-		bin = "tmux"
-	}
-
-	args := make([]string, 0, 5)
-	if strings.TrimSpace(socketPath) != "" {
-		args = append(args, "-S", socketPath)
-	}
-	args = append(args, "kill-session", "-t", sessionName)
-
-	cmd := exec.Command(bin, args...)
-	_ = cmd.Run()
 }

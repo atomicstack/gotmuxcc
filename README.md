@@ -81,6 +81,8 @@ To point at a custom socket:
 tmux, err := gotmuxcc.NewTmux("/path/to/socket")
 ```
 
+A client never starts a tmux server. If nothing is running on the socket, the constructor still succeeds and returns a client with no connection: `ListSessions` reports no sessions, `HasSession` is false, and other commands return an error wrapping `gotmuxcc.ErrNoServer`. `NewSession` starts the server the way plain tmux would, and the control-mode connection is opened on the next command. The connection is also reopened transparently if tmux exits (for example when its last session is killed) and a session is created again later.
+
 ## Architecture
 
 The library is organized into five layers (top to bottom):

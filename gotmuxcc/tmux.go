@@ -100,8 +100,14 @@ func NewTmuxContext(ctx context.Context, socketPath string, opts ...ConstructorO
 }
 
 // NewTmuxWithOptions creates a Tmux client with custom constructor options.
-// It blocks until the initial control-mode handshake completes so that
-// subsequent commands are not affected by the startup %begin/%end pair.
+//
+// If a tmux server with at least one session is running on the socket, it
+// opens the control-mode connection and blocks until the initial handshake
+// completes so that subsequent commands are not affected by the startup
+// %begin/%end pair. If there is no server (or it has no sessions) the client
+// is returned without a connection: nothing is spawned, read-only queries
+// report nothing, other commands wrap ErrNoServer, and NewSession starts the
+// server. Once a session exists the connection is opened on the next command.
 func NewTmuxWithOptions(socketPath string, opts ...ConstructorOption) (*Tmux, error) {
 	cfg := constructorConfig{
 		ctx:              context.Background(),
@@ -114,67 +120,144 @@ func NewTmuxWithOptions(socketPath string, opts ...ConstructorOption) (*Tmux, er
 	if cfg.dialer == nil {
 		return nil, errors.New("gotmuxcc: no transport dialer configured")
 	}
-	transport, err := cfg.dialer.Dial(cfg.ctx, socketPath)
-	if err != nil {
-		return nil, err
-	}
 	t := &Tmux{
-		transport: transport,
+		socketPath: socketPath,
+		dial:       cfg,
+	}
+	if err := t.connect(cfg.ctx); err != nil {
+		if !errors.Is(err, ErrNoServer) {
+			return nil, err
+		}
+		if socketPath != "" {
+			t.Socket = &Socket{Path: socketPath}
+		}
+		return t, nil
 	}
 	if socketPath != "" {
 		socket, sockErr := newSocket(socketPath)
 		if sockErr != nil {
-			_ = transport.Close()
+			_ = t.Close()
 			return nil, sockErr
 		}
 		t.Socket = socket
 	}
-	t.router = newRouter(transport)
-
-	// Wait for the initial %begin/%end from the attach/new-session to
-	// be consumed so that the first user command isn't mismatched.
-	//
-	// A tmux that neither completes the handshake nor closes the transport
-	// would otherwise block here forever, which matters most for NewTmux and
-	// DefaultTmux callers: they get context.Background(), so the closed channel
-	// is their only other escape.
-	var timeout <-chan time.Time
-	if cfg.handshakeTimeout > 0 {
-		timer := time.NewTimer(cfg.handshakeTimeout)
-		defer timer.Stop()
-		timeout = timer.C
-	}
-
-	select {
-	case <-t.router.ready:
-	case <-t.router.closed:
-	case <-cfg.ctx.Done():
-		_ = transport.Close()
-		return nil, cfg.ctx.Err()
-	case <-timeout:
-		_ = transport.Close()
-		return nil, fmt.Errorf("gotmuxcc: timed out after %s waiting for the tmux control-mode handshake", cfg.handshakeTimeout)
-	}
-
 	return t, nil
 }
 
 // Tmux is the entry point to the library.
 //
-// Socket, transport and router are written once during construction and never
-// mutated afterwards, so a Tmux value is safe for concurrent use — including
-// calling Close while commands are still in flight.
+// A Tmux value is safe for concurrent use, including calling Close while
+// commands are still in flight. The connection is opened lazily and reopened
+// after tmux exits, so transport and router are guarded by mu; commands take
+// a snapshot of the router and never hold mu across tmux I/O.
 type Tmux struct {
-	Socket    *Socket
+	Socket *Socket
+
+	socketPath string
+	dial       constructorConfig
+
+	mu        sync.RWMutex
 	transport controlTransport
 	router    *router
+	closed    bool
 
 	closeOnce sync.Once
 	closeErr  error
 }
 
+// connect dials the socket and waits for the control-mode handshake. It
+// returns ErrNoServer (unwrapped by errors.Is) when there is nothing to
+// attach to. The caller must hold t.mu, or own t exclusively.
+func (t *Tmux) connect(ctx context.Context) error {
+	if t.dial.dialer == nil {
+		return errRouterClosed
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	transport, err := t.dial.dialer.Dial(t.dial.ctx, t.socketPath)
+	if err != nil {
+		return err
+	}
+	r := newRouter(transport)
+
+	// Wait for the initial %begin/%end from the attach-session to be
+	// consumed so that the first user command isn't mismatched.
+	//
+	// A tmux that neither completes the handshake nor closes the transport
+	// would otherwise block here forever, which matters most for NewTmux and
+	// DefaultTmux callers: they get context.Background(), so the closed
+	// channel is their only other escape.
+	var timeout <-chan time.Time
+	if t.dial.handshakeTimeout > 0 {
+		timer := time.NewTimer(t.dial.handshakeTimeout)
+		defer timer.Stop()
+		timeout = timer.C
+	}
+
+	select {
+	case <-r.ready:
+	case <-r.closed:
+	case <-ctx.Done():
+		_ = r.close()
+		return ctx.Err()
+	case <-t.dial.ctx.Done():
+		_ = r.close()
+		return t.dial.ctx.Err()
+	case <-timeout:
+		_ = r.close()
+		return fmt.Errorf("gotmuxcc: timed out after %s waiting for the tmux control-mode handshake", t.dial.handshakeTimeout)
+	}
+
+	t.transport = transport
+	t.router = r
+	return nil
+}
+
+// liveRouter returns a router that can take commands, connecting (or
+// reconnecting after tmux exited) when needed. A Tmux built without a dialer
+// keeps whatever router it was given.
+func (t *Tmux) liveRouter(ctx context.Context) (*router, error) {
+	t.mu.RLock()
+	r, closed, lazy := t.router, t.closed, t.dial.dialer != nil
+	t.mu.RUnlock()
+
+	if closed {
+		return nil, errRouterClosed
+	}
+	if r != nil && !r.isClosed() {
+		return r, nil
+	}
+	if !lazy {
+		if r == nil {
+			return nil, errRouterClosed
+		}
+		return r, nil
+	}
+
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.closed {
+		return nil, errRouterClosed
+	}
+	if t.router != nil && !t.router.isClosed() {
+		return t.router, nil
+	}
+	if t.router != nil {
+		// The old connection ended on its own; release its transport
+		// before replacing it.
+		_ = t.router.close()
+		t.router, t.transport = nil, nil
+	}
+	if err := t.connect(ctx); err != nil {
+		return nil, err
+	}
+	return t.router, nil
+}
+
 // Close shuts down the underlying control-mode transport and kills the tmux -C
 // subprocess. Always call Close (e.g. via defer) when finished with a client.
+// A closed client never reconnects.
 //
 // On Linux the child is also reaped automatically if the process dies without
 // Close (parent-death signal). macOS and the BSDs have no such mechanism, so on
@@ -184,20 +267,24 @@ type Tmux struct {
 // Close is safe to call concurrently with in-flight commands and safe to call
 // more than once; repeat calls return the same error as the first.
 //
-// Closing does not clear Socket, transport or router. Clearing them would race
-// with any command still running, and it is unnecessary: router.close fails
-// every pending and in-flight request via failAll, so subsequent commands
-// return errRouterClosed on their own.
+// Closing does not clear transport or router. Clearing them would race with
+// any command still running, and it is unnecessary: router.close fails every
+// pending and in-flight request via failAll, so subsequent commands return
+// errRouterClosed on their own.
 func (t *Tmux) Close() error {
 	if t == nil {
 		return nil
 	}
 	t.closeOnce.Do(func() {
+		t.mu.Lock()
+		t.closed = true
+		r, transport := t.router, t.transport
+		t.mu.Unlock()
 		switch {
-		case t.router != nil:
-			t.closeErr = t.router.close()
-		case t.transport != nil:
-			t.closeErr = t.transport.Close()
+		case r != nil:
+			t.closeErr = r.close()
+		case transport != nil:
+			t.closeErr = transport.Close()
 		}
 	})
 	return t.closeErr
@@ -205,7 +292,12 @@ func (t *Tmux) Close() error {
 
 // events exposes the router's asynchronous event stream.
 func (t *Tmux) events() <-chan Event {
-	if t == nil || t.router == nil {
+	if t == nil {
+		return nil
+	}
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	if t.router == nil {
 		return nil
 	}
 	return t.router.eventsChannel()
@@ -216,10 +308,14 @@ func (t *Tmux) runCommand(command string) (commandResult, error) {
 }
 
 func (t *Tmux) runCommandContext(ctx context.Context, command string) (commandResult, error) {
-	if t == nil || t.router == nil {
+	if t == nil {
 		return commandResult{}, errRouterClosed
 	}
-	return t.router.runCommandContext(ctx, command)
+	r, err := t.liveRouter(ctx)
+	if err != nil {
+		return commandResult{}, err
+	}
+	return r.runCommandContext(ctx, command)
 }
 
 func (t *Tmux) query() *query {

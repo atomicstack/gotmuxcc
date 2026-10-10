@@ -35,28 +35,25 @@ case "$3" in
 esac
 `
 
-// TestPlanInitialSessionAttachesByUnambiguousTarget asserts the attach target
+// TestAttachArgsAttachesByUnambiguousTarget asserts the attach target
 // survives a session name containing tmux's session:window separator.
-func TestPlanInitialSessionAttachesByUnambiguousTarget(t *testing.T) {
+func TestAttachArgsAttachesByUnambiguousTarget(t *testing.T) {
 	path := writeFakeTmux(t, fakeTmuxReportingFormats)
 
-	plan, err := planInitialSession(path, "/tmp/sock")
+	args, err := attachArgs(path, "/tmp/sock")
 	if err != nil {
-		t.Fatalf("planInitialSession returned error: %v", err)
+		t.Fatalf("attachArgs returned error: %v", err)
 	}
-	if len(plan.extraArgs) != 3 || plan.extraArgs[0] != "attach-session" || plan.extraArgs[1] != "-t" {
-		t.Fatalf("unexpected attach args: %#v", plan.extraArgs)
+	if len(args) != 3 || args[0] != "attach-session" || args[1] != "-t" {
+		t.Fatalf("unexpected attach args: %#v", args)
 	}
 
-	target := plan.extraArgs[2]
+	target := args[2]
 	if target == "we:ird" {
 		t.Fatalf("attach target is a session name containing %q, which attach-session cannot resolve: %q", ":", target)
 	}
 	if target != "$3" {
 		t.Fatalf("expected the session id $3 as the attach target, got %q", target)
-	}
-	if plan.bootstrapSession != "" {
-		t.Fatalf("expected no bootstrap session, got %q", plan.bootstrapSession)
 	}
 }
 

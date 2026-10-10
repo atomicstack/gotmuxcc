@@ -805,3 +805,14 @@ func eventForError(name string, raw interface{}, err error) Event {
 		Raw:    fmt.Sprint(raw),
 	}
 }
+
+// isClosed reports whether the router has stopped, either via close or
+// because its transport ended.
+func (r *router) isClosed() bool {
+	select {
+	case <-r.closed:
+		return true
+	default:
+		return false
+	}
+}

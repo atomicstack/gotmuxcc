@@ -3,6 +3,8 @@
 **date:** 2026-03-20
 **source:** ~/git_tree/tmux-popup-control/docs/gotmuxcc-phantom-session-bug.md
 
+> **superseded (2026-10-11):** the bootstrap session described below has been removed. it was found to be broken on both counts: a control client started with `new-session -d` is not attached, so tmux sends `%exit` as soon as the command completes and the connection was never usable; and the constructor validated the socket before the freshly forked server had bound it, so `NewTmux` on an empty socket failed with "not available" while the orphaned server (hosting the bootstrap session and a login shell) lived on until killed by hand. gotmuxcc now never starts a server: on an empty socket the constructor returns a client with no connection, read-only queries report nothing, other commands wrap `ErrNoServer`, `NewSession` starts the server as plain tmux would, and the control-mode connection is opened lazily on the next command (and reopened if tmux exits). the text below is kept as the historical record of the original fix.
+
 ## summary
 
 the reported bug was real. when `gotmuxcc.NewTmux()` connected to a tmux server

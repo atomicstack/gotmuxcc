@@ -88,6 +88,11 @@ func (t *Tmux) ListSessionsContext(ctx context.Context) ([]*Session, error) {
 		cmd("list-sessions").
 		sessionVars().
 		runContext(ctx)
+	if errors.Is(err, ErrNoServer) {
+		// No server means no sessions, which is an answer rather than a
+		// failure.
+		return []*Session{}, nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to list sessions: %w", err)
 	}
@@ -150,6 +155,11 @@ func (t *Tmux) NewSession(op *SessionOptions) (*Session, error) {
 	}
 
 	output, err := q.run()
+	if errors.Is(err, ErrNoServer) {
+		// Nothing to attach to yet: start the server the way plain tmux
+		// would. The next command connects to it.
+		output, err = q.runExec()
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to create session: %w", err)
 	}

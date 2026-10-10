@@ -172,3 +172,50 @@ type queryResult map[string]string
 func (q queryResult) get(key string) string {
 	return q[key]
 }
+
+// argv returns the command as plain arguments for a one-shot tmux client,
+// without the quoting that control mode's line parser needs.
+func (q *query) argv() []string {
+	parts := make([]string, 0, len(q.command)+len(q.flagArgs)+len(q.posArgs)+2)
+	parts = append(parts, q.command...)
+	parts = append(parts, q.flagArgs...)
+	if len(q.variables) > 0 {
+		formats := make([]string, len(q.variables))
+		for idx, variable := range q.variables {
+			formats[idx] = fmt.Sprintf("#{%s}", variable)
+		}
+		flag := "-F"
+		if q.command[0] == "display-message" {
+			flag = "-p"
+		}
+		parts = append(parts, flag, strings.Join(formats, querySeparator))
+	}
+	parts = append(parts, q.posArgs...)
+	return parts
+}
+
+// runExec runs the query as a plain tmux client instead of over control mode.
+// It exists for commands that must work with no server to attach to.
+func (q *query) runExec() (*queryOutput, error) {
+	if q.tmux == nil {
+		return nil, errors.New("gotmuxcc: query has no tmux instance")
+	}
+	if len(q.command) == 0 {
+		return nil, errors.New("gotmuxcc: query has no command")
+	}
+	args := q.argv()
+	out, err := tmuxExecCommand(q.tmux.socketPath, args)
+	if err != nil {
+		return nil, err
+	}
+	var lines []string
+	for _, line := range strings.Split(strings.TrimRight(string(out), "\n"), "\n") {
+		if line != "" {
+			lines = append(lines, line)
+		}
+	}
+	return &queryOutput{
+		result:    commandResult{Command: strings.Join(args, " "), Lines: lines},
+		variables: append([]string(nil), q.variables...),
+	}, nil
+}
