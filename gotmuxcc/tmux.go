@@ -124,7 +124,7 @@ func NewTmuxWithOptions(socketPath string, opts ...ConstructorOption) (*Tmux, er
 		socketPath: socketPath,
 		dial:       cfg,
 	}
-	if err := t.connect(cfg.ctx); err != nil {
+	if _, err := t.liveRouter(cfg.ctx); err != nil {
 		if !errors.Is(err, ErrNoServer) {
 			return nil, err
 		}
@@ -160,34 +160,149 @@ type Tmux struct {
 	transport controlTransport
 	router    *router
 	closed    bool
+	// connecting is non-nil while one goroutine is dialing on behalf of all
+	// callers; it is closed when that attempt finishes. connectCancel aborts
+	// the attempt's handshake wait so Close never queues behind it.
+	connecting    chan struct{}
+	connectCancel context.CancelFunc
 
 	closeOnce sync.Once
 	closeErr  error
 }
 
-// connect dials the socket and waits for the control-mode handshake. It
-// returns ErrNoServer (unwrapped by errors.Is) when there is nothing to
-// attach to. The caller must hold t.mu, or own t exclusively.
-func (t *Tmux) connect(ctx context.Context) error {
-	if t.dial.dialer == nil {
-		return errRouterClosed
-	}
+// errHandshakeClosed reports that tmux ended the connection before the
+// startup handshake completed, typically because the server went away between
+// discovery and attach.
+var errHandshakeClosed = errors.New("gotmuxcc: control transport closed before the handshake completed")
+
+// liveRouter returns a router that can take commands, connecting (or
+// reconnecting after tmux exited) when needed. Only one connect runs at a
+// time; concurrent callers wait for it and then re-check. A Tmux built
+// without a dialer keeps whatever router it was given.
+func (t *Tmux) liveRouter(ctx context.Context) (*router, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	transport, err := t.dial.dialer.Dial(t.dial.ctx, t.socketPath)
-	if err != nil {
-		return err
-	}
-	r := newRouter(transport)
+	for {
+		t.mu.RLock()
+		r, closed, lazy, connecting := t.router, t.closed, t.dial.dialer != nil, t.connecting
+		t.mu.RUnlock()
 
-	// Wait for the initial %begin/%end from the attach-session to be
-	// consumed so that the first user command isn't mismatched.
-	//
-	// A tmux that neither completes the handshake nor closes the transport
-	// would otherwise block here forever, which matters most for NewTmux and
-	// DefaultTmux callers: they get context.Background(), so the closed
-	// channel is their only other escape.
+		if closed {
+			return nil, errRouterClosed
+		}
+		if r != nil && !r.isClosed() {
+			return r, nil
+		}
+		if !lazy {
+			if r == nil {
+				return nil, errRouterClosed
+			}
+			return r, nil
+		}
+		if connecting != nil {
+			select {
+			case <-connecting:
+				continue
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		}
+
+		t.mu.Lock()
+		if t.closed {
+			t.mu.Unlock()
+			return nil, errRouterClosed
+		}
+		if t.router != nil && !t.router.isClosed() {
+			r := t.router
+			t.mu.Unlock()
+			return r, nil
+		}
+		if t.connecting != nil {
+			t.mu.Unlock()
+			continue
+		}
+		done := make(chan struct{})
+		connCtx, cancel := context.WithCancel(ctx)
+		t.connecting, t.connectCancel = done, cancel
+		stale := t.router
+		t.router, t.transport = nil, nil
+		t.mu.Unlock()
+
+		if stale != nil {
+			// The old connection ended on its own; release its transport
+			// before replacing it.
+			_ = stale.close()
+		}
+		transport, r, err := t.dialAndHandshake(connCtx)
+		cancel()
+
+		t.mu.Lock()
+		t.connecting, t.connectCancel = nil, nil
+		if t.closed {
+			if err == nil {
+				err = errRouterClosed
+			}
+		} else if err == nil {
+			t.transport, t.router = transport, r
+		}
+		t.mu.Unlock()
+		close(done)
+
+		if err != nil {
+			if r != nil {
+				_ = r.close()
+			}
+			if t.isClosed() {
+				return nil, errRouterClosed
+			}
+			return nil, err
+		}
+		return r, nil
+	}
+}
+
+func (t *Tmux) isClosed() bool {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.closed
+}
+
+// dialAndHandshake dials the socket and waits for the control-mode handshake,
+// without holding t.mu. It returns ErrNoServer (via errors.Is) when there is
+// nothing to attach to. If tmux ends the connection before the handshake —
+// the server vanished between discovery and attach-session — it dials once
+// more so the outcome reflects the server's current state rather than a dead
+// transport; on success the returned router is non-nil and ready, on failure
+// it is nil and already closed.
+func (t *Tmux) dialAndHandshake(ctx context.Context) (controlTransport, *router, error) {
+	for attempt := 0; ; attempt++ {
+		transport, err := t.dial.dialer.Dial(t.dial.ctx, t.socketPath)
+		if err != nil {
+			return nil, nil, err
+		}
+		r := newRouter(transport)
+		err = t.awaitHandshake(ctx, r)
+		if err == nil {
+			return transport, r, nil
+		}
+		_ = r.close()
+		if attempt == 0 && errors.Is(err, errHandshakeClosed) {
+			continue
+		}
+		return nil, nil, err
+	}
+}
+
+// awaitHandshake waits for the initial %begin/%end from the attach-session to
+// be consumed so that the first user command isn't mismatched.
+//
+// A tmux that neither completes the handshake nor closes the transport would
+// otherwise block here forever, which matters most for NewTmux and
+// DefaultTmux callers: they get context.Background(), so the closed channel
+// is their only other escape.
+func (t *Tmux) awaitHandshake(ctx context.Context, r *router) error {
 	var timeout <-chan time.Time
 	if t.dial.handshakeTimeout > 0 {
 		timer := time.NewTimer(t.dial.handshakeTimeout)
@@ -197,67 +312,24 @@ func (t *Tmux) connect(ctx context.Context) error {
 
 	select {
 	case <-r.ready:
+		if r.isClosed() {
+			return fmt.Errorf("%w: %v", errHandshakeClosed, r.failure())
+		}
+		return nil
 	case <-r.closed:
+		return fmt.Errorf("%w: %v", errHandshakeClosed, r.failure())
 	case <-ctx.Done():
-		_ = r.close()
 		return ctx.Err()
 	case <-t.dial.ctx.Done():
-		_ = r.close()
 		return t.dial.ctx.Err()
 	case <-timeout:
-		_ = r.close()
 		return fmt.Errorf("gotmuxcc: timed out after %s waiting for the tmux control-mode handshake", t.dial.handshakeTimeout)
 	}
-
-	t.transport = transport
-	t.router = r
-	return nil
-}
-
-// liveRouter returns a router that can take commands, connecting (or
-// reconnecting after tmux exited) when needed. A Tmux built without a dialer
-// keeps whatever router it was given.
-func (t *Tmux) liveRouter(ctx context.Context) (*router, error) {
-	t.mu.RLock()
-	r, closed, lazy := t.router, t.closed, t.dial.dialer != nil
-	t.mu.RUnlock()
-
-	if closed {
-		return nil, errRouterClosed
-	}
-	if r != nil && !r.isClosed() {
-		return r, nil
-	}
-	if !lazy {
-		if r == nil {
-			return nil, errRouterClosed
-		}
-		return r, nil
-	}
-
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	if t.closed {
-		return nil, errRouterClosed
-	}
-	if t.router != nil && !t.router.isClosed() {
-		return t.router, nil
-	}
-	if t.router != nil {
-		// The old connection ended on its own; release its transport
-		// before replacing it.
-		_ = t.router.close()
-		t.router, t.transport = nil, nil
-	}
-	if err := t.connect(ctx); err != nil {
-		return nil, err
-	}
-	return t.router, nil
 }
 
 // Close shuts down the underlying control-mode transport and kills the tmux -C
 // subprocess. Always call Close (e.g. via defer) when finished with a client.
-// A closed client never reconnects.
+// A closed client never reconnects; a reconnect in flight is aborted.
 //
 // On Linux the child is also reaped automatically if the process dies without
 // Close (parent-death signal). macOS and the BSDs have no such mechanism, so on
@@ -278,8 +350,18 @@ func (t *Tmux) Close() error {
 	t.closeOnce.Do(func() {
 		t.mu.Lock()
 		t.closed = true
-		r, transport := t.router, t.transport
+		cancel, connecting := t.connectCancel, t.connecting
 		t.mu.Unlock()
+		if cancel != nil {
+			cancel()
+		}
+		if connecting != nil {
+			// The aborted connect closes its own router before signalling.
+			<-connecting
+		}
+		t.mu.RLock()
+		r, transport := t.router, t.transport
+		t.mu.RUnlock()
 		switch {
 		case r != nil:
 			t.closeErr = r.close()

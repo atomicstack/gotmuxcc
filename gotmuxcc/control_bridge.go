@@ -44,6 +44,13 @@ func newControlTransport(ctx context.Context, socketPath string) (controlTranspo
 // attach-session targeting the first existing session by id. With no session
 // to attach to it returns ErrNoServer and no command, so the caller spawns
 // nothing.
+//
+// Discovery and attach are two tmux invocations, and attach-session carries
+// CMD_STARTSERVER, so if the server exits in between, the attach itself
+// starts one. That server sources the user's configuration, fails the attach
+// with "no sessions", and exits on its own; the dialer then sees the
+// handshake die and re-runs discovery. The window is a few milliseconds and
+// tmux offers no client flag to close it.
 func attachArgs(tmuxBinary, socketPath string) ([]string, error) {
 	bin := strings.TrimSpace(tmuxBinary)
 	if bin == "" {

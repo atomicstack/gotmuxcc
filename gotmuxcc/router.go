@@ -816,3 +816,10 @@ func (r *router) isClosed() bool {
 		return false
 	}
 }
+
+// failure returns the error the router stopped with, or nil while running.
+func (r *router) failure() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.err
+}

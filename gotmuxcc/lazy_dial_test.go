@@ -259,3 +259,98 @@ func TestCloseStopsReconnecting(t *testing.T) {
 		t.Fatalf("a closed client must not dial again, got %d dials", dialer.count())
 	}
 }
+
+// deadTransport returns a transport whose tmux has already exited, as happens
+// when attach-session finds the server gone: no handshake, just closure.
+func deadTransport() *scriptedTransport {
+	tr := newScriptedTransport(nil)
+	tr.Close()
+	return tr
+}
+
+// TestHandshakeFailureRechecksForServer covers the server vanishing between
+// discovery and attach: the attach dies before the handshake, and the client
+// must ask again rather than install a dead connection or fail construction.
+func TestHandshakeFailureRechecksForServer(t *testing.T) {
+	dialer := &lazyDialer{next: func(call int) (controlTransport, error) {
+		if call == 1 {
+			return deadTransport(), nil
+		}
+		return nil, ErrNoServer
+	}}
+
+	tmux, err := NewTmuxWithOptions("/tmp/sock", WithDialer(dialer), WithHandshakeTimeout(time.Second))
+	if err != nil {
+		t.Fatalf("a failed attach on a vanished server must not fail construction: %v", err)
+	}
+	defer tmux.Close()
+
+	sessions, err := tmux.ListSessions()
+	if err != nil {
+		t.Fatalf("ListSessions must treat the vanished server as empty, got %v", err)
+	}
+	if len(sessions) != 0 {
+		t.Fatalf("expected no sessions, got %#v", sessions)
+	}
+	if dialer.count() < 2 {
+		t.Fatalf("expected the client to re-check for a server after the failed attach, got %d dials", dialer.count())
+	}
+}
+
+// TestCloseInterruptsSlowReconnect pins that Close is prompt even while a
+// reconnect is waiting on a tmux that never completes the handshake: it must
+// not queue behind the handshake timeout, and the wedged transport must be
+// torn down.
+func TestCloseInterruptsSlowReconnect(t *testing.T) {
+	wedged := newWedgedTransport()
+	dialer := &lazyDialer{next: func(call int) (controlTransport, error) {
+		if call == 1 {
+			return nil, ErrNoServer
+		}
+		return wedged, nil
+	}}
+
+	tmux, err := NewTmuxWithOptions("/tmp/sock", WithDialer(dialer), WithHandshakeTimeout(10*time.Second))
+	if err != nil {
+		t.Fatalf("NewTmuxWithOptions returned error: %v", err)
+	}
+
+	listDone := make(chan error, 1)
+	go func() {
+		_, err := tmux.GetServerInformation()
+		listDone <- err
+	}()
+	// Wait until the reconnect is parked in the handshake.
+	deadline := time.Now().Add(2 * time.Second)
+	for dialer.count() < 2 {
+		if time.Now().After(deadline) {
+			t.Fatalf("reconnect never dialed")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	closeDone := make(chan error, 1)
+	go func() { closeDone <- tmux.Close() }()
+	select {
+	case err := <-closeDone:
+		if err != nil {
+			t.Fatalf("Close returned error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("Close blocked behind the in-flight reconnect")
+	}
+
+	select {
+	case err := <-listDone:
+		if err == nil {
+			t.Fatalf("the command interrupted by Close must fail")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("the interrupted command never returned")
+	}
+	select {
+	case <-wedged.waitClosed():
+	case <-time.After(2 * time.Second):
+		t.Fatalf("Close did not tear down the transport dialed by the reconnect")
+	}
+}
